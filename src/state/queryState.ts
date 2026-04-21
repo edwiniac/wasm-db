@@ -1,7 +1,11 @@
 import type { Batch } from '@/engine/types';
 import type { AppError } from '@/errors';
+import type { ColumnInfo } from '@/engine/schema';
+
+export type { ColumnInfo };
 
 export type QueryStatus = 'idle' | 'probing' | 'executing' | 'error' | 'done';
+export type SchemaStatus = 'idle' | 'loading' | 'loaded' | 'error';
 
 export interface QueryState {
   parquetURL: string;
@@ -10,6 +14,8 @@ export interface QueryState {
   results: Batch[];
   error: AppError | null;
   rowCount: number;
+  schema: ColumnInfo[] | null;
+  schemaStatus: SchemaStatus;
 }
 
 export type QueryAction =
@@ -22,7 +28,10 @@ export type QueryAction =
   | { type: 'QUERY_DONE'; rowCount: number }
   | { type: 'ERROR'; error: AppError }
   | { type: 'CANCEL' }
-  | { type: 'RESET' };
+  | { type: 'RESET' }
+  | { type: 'SCHEMA_START' }
+  | { type: 'SCHEMA_DONE'; columns: ColumnInfo[] }
+  | { type: 'SCHEMA_ERROR' };
 
 export const initialState: QueryState = {
   parquetURL: '',
@@ -31,12 +40,22 @@ export const initialState: QueryState = {
   results: [],
   error: null,
   rowCount: 0,
+  schema: null,
+  schemaStatus: 'idle',
 };
 
 export function queryReducer(state: QueryState, action: QueryAction): QueryState {
   switch (action.type) {
     case 'SET_URL':
-      return { ...state, parquetURL: action.url, status: 'idle', results: [], error: null };
+      return {
+        ...state,
+        parquetURL: action.url,
+        status: 'idle',
+        results: [],
+        error: null,
+        schema: null,
+        schemaStatus: 'idle',
+      };
 
     case 'SET_QUERY':
       return { ...state, queryText: action.sql };
@@ -64,6 +83,15 @@ export function queryReducer(state: QueryState, action: QueryAction): QueryState
 
     case 'RESET':
       return { ...initialState };
+
+    case 'SCHEMA_START':
+      return { ...state, schemaStatus: 'loading' };
+
+    case 'SCHEMA_DONE':
+      return { ...state, schemaStatus: 'loaded', schema: action.columns };
+
+    case 'SCHEMA_ERROR':
+      return { ...state, schemaStatus: 'error' };
 
     default:
       return state;
