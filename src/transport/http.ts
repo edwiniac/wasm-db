@@ -31,14 +31,16 @@ export class HttpTransport implements ITransport {
     this.smallFileLimitBytes = options.smallFileLimitBytes ?? DEFAULT_SMALL_FILE_LIMIT_BYTES;
   }
 
-  async probeURL(url: string): Promise<ProbeResult> {
+  async probeURL(url: string, signal?: AbortSignal): Promise<ProbeResult> {
     let response: Response;
     try {
       response = await fetch(url, {
         method: 'GET',
         headers: { Range: 'bytes=0-0' },
+        signal,
       });
     } catch (err) {
+      if (isAbortError(err)) throw err;
       throw new CORSError(url, err);
     }
 
@@ -133,11 +135,7 @@ export class HttpTransport implements ITransport {
     throw new TransportError(`Exhausted retries for ${url}`, lastError);
   }
 
-  private async _handle416(
-    url: string,
-    end: number,
-    signal: AbortSignal,
-  ): Promise<Uint8Array> {
+  private async _handle416(url: string, end: number, signal: AbortSignal): Promise<Uint8Array> {
     if (end + 1 > this.smallFileLimitBytes) {
       throw new RangeNotSupportedError(url);
     }

@@ -54,3 +54,10 @@ export class WorkerError extends AppError {
     this.name = 'WorkerError';
   }
 }
+
+export class QueryCancelledError extends AppError {
+  constructor(message = 'Query cancelled by user') {
+    super('QUERY_CANCELLED', message);
+    this.name = 'QueryCancelledError';
+  }
+}

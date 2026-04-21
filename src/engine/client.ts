@@ -1,6 +1,6 @@
 import type { MainToWorker, WorkerToMain } from '@/workers/protocol';
 import type { QueryHandle, QueryOpts, Batch, QuerySummary } from './types';
-import { QueryError, WorkerError } from '@/errors';
+import { QueryCancelledError, QueryError, WorkerError } from '@/errors';
 
 type WorkerFactory = () => Worker;
 
@@ -98,7 +98,11 @@ export class EngineClient {
       case 'error': {
         const handle = this.pending.get(msg.correlationId);
         if (handle) {
-          handle._receiveError(new QueryError(msg.error.message));
+          const err =
+            msg.error.code === 'QUERY_CANCELLED'
+              ? new QueryCancelledError(msg.error.message)
+              : new QueryError(msg.error.message);
+          handle._receiveError(err);
           this.pending.delete(msg.correlationId);
         } else if (msg.correlationId === 'init-0') {
           this.readyReject(new WorkerError(msg.error.message));

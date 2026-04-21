@@ -6,6 +6,6 @@ export interface ProbeResult {
 }
 
 export interface ITransport {
-  probeURL(url: string): Promise<ProbeResult>;
+  probeURL(url: string, signal?: AbortSignal): Promise<ProbeResult>;
   fetchRange(url: string, start: number, end: number, signal: AbortSignal): Promise<Uint8Array>;
 }

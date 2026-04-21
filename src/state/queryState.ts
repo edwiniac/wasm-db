@@ -21,6 +21,7 @@ export type QueryAction =
   | { type: 'BATCH_RECEIVED'; batch: Batch }
   | { type: 'QUERY_DONE'; rowCount: number }
   | { type: 'ERROR'; error: AppError }
+  | { type: 'CANCEL' }
   | { type: 'RESET' };
 
 export const initialState: QueryState = {
@@ -57,6 +58,9 @@ export function queryReducer(state: QueryState, action: QueryAction): QueryState
 
     case 'ERROR':
       return { ...state, status: 'error', error: action.error };
+
+    case 'CANCEL':
+      return { ...state, status: 'idle', error: null };
 
     case 'RESET':
       return { ...initialState };

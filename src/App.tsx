@@ -1,6 +1,7 @@
 import { useReducer, useCallback, useRef, useEffect } from 'react';
 import { queryReducer, initialState } from '@/state/queryState';
-import { getEngine, getTransport } from '@/state/queryService';
+import { getEngine, getTransport, shutdownEngine } from '@/state/queryService';
+import { AppError, TransportError, QueryError, QueryCancelledError } from '@/errors';
 import { URLInput } from '@/ui/URLInput';
 import { SQLEditor } from '@/ui/SQLEditor';
 import { ResultsTable } from '@/ui/ResultsTable';
@@ -11,6 +12,10 @@ import type { QueryHandle } from '@/state/queryService';
 export default function App() {
   const [state, dispatch] = useReducer(queryReducer, initialState);
   const cancelRef = useRef<(() => void) | null>(null);
+  const probeAbortRef = useRef<AbortController | null>(null);
+
+  // Shutdown worker on unmount
+  useEffect(() => () => shutdownEngine(), []);
 
   // Sync URL from hash param on mount
   useEffect(() => {
@@ -20,24 +25,33 @@ export default function App() {
     if (url) dispatch({ type: 'SET_URL', url });
   }, []);
 
-  // When URL changes, replace __URL__ placeholder in query template
+  // When URL changes, update the parquet_scan URL in-place — preserves user edits to the rest of the query
   useEffect(() => {
     if (!state.parquetURL) return;
-    const next = initialState.queryText.replace('__URL__', state.parquetURL);
-    dispatch({ type: 'SET_QUERY', sql: next });
+    const next = state.queryText
+      .replace('__URL__', state.parquetURL)
+      .replace(/parquet_scan\('[^']*'\)/g, `parquet_scan('${state.parquetURL}')`);
+    if (next !== state.queryText) dispatch({ type: 'SET_QUERY', sql: next });
+    // Intentionally omitting state.queryText from deps — we only want this to fire on URL change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.parquetURL]);
 
   const handleProbe = useCallback(async () => {
+    probeAbortRef.current?.abort();
+    const controller = new AbortController();
+    probeAbortRef.current = controller;
     dispatch({ type: 'PROBE_START' });
     try {
-      await getTransport().probeURL(state.parquetURL);
+      await getTransport().probeURL(state.parquetURL, controller.signal);
       dispatch({ type: 'PROBE_DONE' });
     } catch (err) {
-      const { AppError, TransportError } = await import('@/errors');
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       dispatch({
         type: 'ERROR',
         error: err instanceof AppError ? err : new TransportError(String(err)),
       });
+    } finally {
+      probeAbortRef.current = null;
     }
   }, [state.parquetURL]);
 
@@ -54,7 +68,7 @@ export default function App() {
       }
       dispatch({ type: 'QUERY_DONE', rowCount: total });
     } catch (err) {
-      const { AppError, QueryError } = await import('@/errors');
+      if (err instanceof QueryCancelledError) return; // handleCancel already set state to idle
       dispatch({
         type: 'ERROR',
         error: err instanceof AppError ? err : new QueryError(String(err)),
@@ -65,8 +79,9 @@ export default function App() {
   }, [state.queryText]);
 
   const handleCancel = useCallback(() => {
+    probeAbortRef.current?.abort();
     cancelRef.current?.();
-    dispatch({ type: 'RESET' });
+    dispatch({ type: 'CANCEL' });
   }, []);
 
   const isExecuting = state.status === 'executing' || state.status === 'probing';

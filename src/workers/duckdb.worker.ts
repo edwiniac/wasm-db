@@ -41,6 +41,14 @@ async function handleInit(correlationId: string, config: DuckDBWorkerConfig): Pr
   }
 }
 
+function sanitizeRow(row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row)) {
+    out[k] = typeof v === 'bigint' ? String(v) : v;
+  }
+  return out;
+}
+
 async function handleQuery(correlationId: string, sql: string): Promise<void> {
   if (!conn) {
     post({
@@ -58,10 +66,10 @@ async function handleQuery(correlationId: string, sql: string): Promise<void> {
 
     const result = await conn.query(sql);
 
-    // Convert Arrow table to plain objects; BigInt values serialize as strings (known Phase 1 limitation)
+    // Convert Arrow table to plain objects; BigInt (INT64) values are stringified for postMessage compatibility
     const rows: Record<string, unknown>[] = result
       .toArray()
-      .map((row) => row.toJSON() as Record<string, unknown>);
+      .map((row) => sanitizeRow(row.toJSON() as Record<string, unknown>));
 
     post({ kind: 'batch', correlationId, rows, done: true });
   } catch (err) {
