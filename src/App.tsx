@@ -1,5 +1,5 @@
-import { useReducer, useCallback, useRef, useEffect } from 'react';
-import { queryReducer, initialState } from '@/state/queryState';
+import { useCallback, useRef, useEffect } from 'react';
+import { useQueryStore } from '@/state/store';
 import { getEngine, getTransport, shutdownEngine } from '@/state/queryService';
 import { AppError, TransportError, QueryError, QueryCancelledError } from '@/errors';
 import { URLInput } from '@/ui/URLInput';
@@ -10,7 +10,14 @@ import { ErrorPanel } from '@/ui/ErrorPanel';
 import type { QueryHandle } from '@/state/queryService';
 
 export default function App() {
-  const [state, dispatch] = useReducer(queryReducer, initialState);
+  const parquetURL = useQueryStore((s) => s.parquetURL);
+  const queryText = useQueryStore((s) => s.queryText);
+  const status = useQueryStore((s) => s.status);
+  const results = useQueryStore((s) => s.results);
+  const error = useQueryStore((s) => s.error);
+  const rowCount = useQueryStore((s) => s.rowCount);
+  const dispatch = useQueryStore((s) => s.dispatch);
+
   const cancelRef = useRef<(() => void) | null>(null);
   const probeAbortRef = useRef<AbortController | null>(null);
 
@@ -23,18 +30,18 @@ export default function App() {
     const params = new URLSearchParams(hash);
     const url = params.get('url');
     if (url) dispatch({ type: 'SET_URL', url });
-  }, []);
+  }, [dispatch]);
 
   // When URL changes, update the parquet_scan URL in-place — preserves user edits to the rest of the query
   useEffect(() => {
-    if (!state.parquetURL) return;
-    const next = state.queryText
-      .replace('__URL__', state.parquetURL)
-      .replace(/parquet_scan\('[^']*'\)/g, `parquet_scan('${state.parquetURL}')`);
-    if (next !== state.queryText) dispatch({ type: 'SET_QUERY', sql: next });
-    // Intentionally omitting state.queryText from deps — we only want this to fire on URL change
+    if (!parquetURL) return;
+    const next = queryText
+      .replace('__URL__', parquetURL)
+      .replace(/parquet_scan\('[^']*'\)/g, `parquet_scan('${parquetURL}')`);
+    if (next !== queryText) dispatch({ type: 'SET_QUERY', sql: next });
+    // Intentionally omitting queryText from deps — we only want this to fire on URL change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.parquetURL]);
+  }, [parquetURL]);
 
   const handleProbe = useCallback(async () => {
     probeAbortRef.current?.abort();
@@ -42,7 +49,7 @@ export default function App() {
     probeAbortRef.current = controller;
     dispatch({ type: 'PROBE_START' });
     try {
-      await getTransport().probeURL(state.parquetURL, controller.signal);
+      await getTransport().probeURL(parquetURL, controller.signal);
       dispatch({ type: 'PROBE_DONE' });
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -53,13 +60,13 @@ export default function App() {
     } finally {
       probeAbortRef.current = null;
     }
-  }, [state.parquetURL]);
+  }, [parquetURL, dispatch]);
 
   const handleRun = useCallback(async () => {
     dispatch({ type: 'QUERY_START' });
     let handle: QueryHandle | null = null;
     try {
-      handle = await getEngine().runQuery(state.queryText);
+      handle = await getEngine().runQuery(queryText);
       cancelRef.current = () => handle?.cancel();
       let total = 0;
       for await (const batch of handle.stream) {
@@ -68,7 +75,7 @@ export default function App() {
       }
       dispatch({ type: 'QUERY_DONE', rowCount: total });
     } catch (err) {
-      if (err instanceof QueryCancelledError) return; // handleCancel already set state to idle
+      if (err instanceof QueryCancelledError) return;
       dispatch({
         type: 'ERROR',
         error: err instanceof AppError ? err : new QueryError(String(err)),
@@ -76,15 +83,15 @@ export default function App() {
     } finally {
       cancelRef.current = null;
     }
-  }, [state.queryText]);
+  }, [queryText, dispatch]);
 
   const handleCancel = useCallback(() => {
     probeAbortRef.current?.abort();
     cancelRef.current?.();
     dispatch({ type: 'CANCEL' });
-  }, []);
+  }, [dispatch]);
 
-  const isExecuting = state.status === 'executing' || state.status === 'probing';
+  const isExecuting = status === 'executing' || status === 'probing';
 
   return (
     <div
@@ -98,14 +105,14 @@ export default function App() {
       }}
     >
       <URLInput
-        value={state.parquetURL}
-        status={state.status}
+        value={parquetURL}
+        status={status}
         onChange={(url) => dispatch({ type: 'SET_URL', url })}
         onProbe={handleProbe}
       />
       <div style={{ padding: '0 12px 8px' }}>
         <SQLEditor
-          value={state.queryText}
+          value={queryText}
           disabled={isExecuting}
           onChange={(sql) => dispatch({ type: 'SET_QUERY', sql })}
           onRun={handleRun}
@@ -113,17 +120,17 @@ export default function App() {
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
           <button
             onClick={handleRun}
-            disabled={isExecuting || !state.parquetURL.trim()}
+            disabled={isExecuting || !parquetURL.trim()}
             aria-label="Run query"
             style={{ padding: '6px 16px' }}
           >
-            {state.status === 'executing' ? 'Running…' : 'Run'}
+            {status === 'executing' ? 'Running…' : 'Run'}
           </button>
         </div>
       </div>
-      {state.error && <ErrorPanel error={state.error} />}
-      <ResultsTable batches={state.results} rowCount={state.rowCount} />
-      <StatusBar status={state.status} rowCount={state.rowCount} onCancel={handleCancel} />
+      {error && <ErrorPanel error={error} />}
+      <ResultsTable batches={results} rowCount={rowCount} />
+      <StatusBar status={status} rowCount={rowCount} onCancel={handleCancel} />
     </div>
   );
 }
