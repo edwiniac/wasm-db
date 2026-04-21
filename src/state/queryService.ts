@@ -1,12 +1,15 @@
-// Wraps EngineClient and HttpTransport so UI never imports from engine/ or transport/ directly.
-// Phase 2: this moves into Zustand actions.
 import { EngineClient } from '@/engine/client';
 import { HttpTransport } from '@/transport/http';
-import { StubCache } from '@/cache/stub';
+import { MemoryLRU } from '@/cache/memory';
+import { IndexedDBCache } from '@/cache/indexeddb';
+import { TieredCache } from '@/cache/tiered';
+import { db } from '@/cache/db';
 import type { QueryHandle } from '@/engine/types';
 
 let engine: EngineClient | null = null;
-const transport = new HttpTransport({ cache: new StubCache() });
+
+const cache = new TieredCache(new MemoryLRU(), new IndexedDBCache(db));
+const transport = new HttpTransport({ cache });
 
 export function getTransport(): HttpTransport {
   return transport;
