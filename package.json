@@ -17,7 +17,8 @@
     "test:e2e:ui": "playwright test --ui",
     "test:reload": "vitest run --reporter=verbose tests/integration/reload.test.ts",
     "analyze": "vite build --mode analyze",
-    "check:layers": "depcruise src --config .dependency-cruiser.cjs"
+    "check:layers": "depcruise src --config .dependency-cruiser.cjs",
+    "prepare": "husky"
   },
   "dependencies": {
     "@codemirror/commands": "^6.8.1",
@@ -56,8 +57,18 @@
     "vite": "^8.0.9",
     "vitest": "^3.2.3"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
   "lint-staged": {
-    "*.{ts,tsx}": ["eslint --fix --max-warnings 0", "prettier --write"],
-    "*.{json,css,md}": ["prettier --write"]
+    "*.{ts,tsx}": [
+      "eslint --fix --max-warnings 0",
+      "prettier --write"
+    ],
+    "*.{json,css,md}": [
+      "prettier --write"
+    ]
   }
 }

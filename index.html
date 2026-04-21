@@ -4,7 +4,10 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>wasm-db-temp</title>
+    <!-- COOP/COEP meta fallback — required for SharedArrayBuffer / multi-threaded DuckDB -->
+    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin" />
+    <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp" />
+    <title>wasm-db</title>
   </head>
   <body>
     <div id="root"></div>
