@@ -4,7 +4,9 @@ import { MemoryLRU } from '@/cache/memory';
 import { IndexedDBCache } from '@/cache/indexeddb';
 import { TieredCache } from '@/cache/tiered';
 import { db } from '@/cache/db';
+import { fetchSchema } from '@/engine/schema';
 import type { QueryHandle } from '@/engine/types';
+import type { ColumnInfo } from '@/engine/schema';
 
 let engine: EngineClient | null = null;
 
@@ -25,4 +27,8 @@ export function shutdownEngine(): void {
   engine = null;
 }
 
-export type { QueryHandle };
+export async function loadSchema(url: string): Promise<ColumnInfo[]> {
+  return fetchSchema(url, getEngine());
+}
+
+export type { QueryHandle, ColumnInfo };

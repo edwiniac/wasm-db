@@ -1,12 +1,13 @@
 import { useCallback, useRef, useEffect } from 'react';
 import { useQueryStore } from '@/state/store';
-import { getEngine, getTransport, shutdownEngine } from '@/state/queryService';
+import { getEngine, getTransport, shutdownEngine, loadSchema } from '@/state/queryService';
 import { AppError, TransportError, QueryError, QueryCancelledError } from '@/errors';
 import { URLInput } from '@/ui/URLInput';
 import { SQLEditor } from '@/ui/SQLEditor';
 import { ResultsTable } from '@/ui/ResultsTable';
 import { StatusBar } from '@/ui/StatusBar';
 import { ErrorPanel } from '@/ui/ErrorPanel';
+import { SchemaTree } from '@/ui/SchemaTree';
 import type { QueryHandle } from '@/state/queryService';
 
 export default function App() {
@@ -16,6 +17,8 @@ export default function App() {
   const results = useQueryStore((s) => s.results);
   const error = useQueryStore((s) => s.error);
   const rowCount = useQueryStore((s) => s.rowCount);
+  const schema = useQueryStore((s) => s.schema);
+  const schemaStatus = useQueryStore((s) => s.schemaStatus);
   const dispatch = useQueryStore((s) => s.dispatch);
 
   const cancelRef = useRef<(() => void) | null>(null);
@@ -32,14 +35,13 @@ export default function App() {
     if (url) dispatch({ type: 'SET_URL', url });
   }, [dispatch]);
 
-  // When URL changes, update the parquet_scan URL in-place — preserves user edits to the rest of the query
+  // When URL changes, update the parquet_scan URL in-place — preserves user edits
   useEffect(() => {
     if (!parquetURL) return;
     const next = queryText
       .replace('__URL__', parquetURL)
       .replace(/parquet_scan\('[^']*'\)/g, `parquet_scan('${parquetURL}')`);
     if (next !== queryText) dispatch({ type: 'SET_QUERY', sql: next });
-    // Intentionally omitting queryText from deps — we only want this to fire on URL change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parquetURL]);
 
@@ -51,6 +53,11 @@ export default function App() {
     try {
       await getTransport().probeURL(parquetURL, controller.signal);
       dispatch({ type: 'PROBE_DONE' });
+      // Fire schema fetch in background — probe returns to idle immediately
+      dispatch({ type: 'SCHEMA_START' });
+      loadSchema(parquetURL)
+        .then((columns) => dispatch({ type: 'SCHEMA_DONE', columns }))
+        .catch(() => dispatch({ type: 'SCHEMA_ERROR' }));
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       dispatch({
@@ -110,6 +117,7 @@ export default function App() {
         onChange={(url) => dispatch({ type: 'SET_URL', url })}
         onProbe={handleProbe}
       />
+      <SchemaTree columns={schema} status={schemaStatus} />
       <div style={{ padding: '0 12px 8px' }}>
         <SQLEditor
           value={queryText}
