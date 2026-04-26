@@ -34,3 +34,39 @@ describe('queryReducer — schema actions', () => {
     expect(after.schemaStatus).toBe('idle');
   });
 });
+
+describe('queryReducer — sharing actions', () => {
+  it('SET_SHARED_FINGERPRINT stores the fingerprint', () => {
+    const next = queryReducer(initialState, {
+      type: 'SET_SHARED_FINGERPRINT',
+      fingerprint: 'abc12345',
+    });
+    expect(next.sharedFingerprint).toBe('abc12345');
+    expect(next.schemaDrift).toBe(false);
+  });
+
+  it('SCHEMA_DRIFT_DETECTED sets schemaDrift to true', () => {
+    const next = queryReducer(initialState, { type: 'SCHEMA_DRIFT_DETECTED' });
+    expect(next.schemaDrift).toBe(true);
+  });
+
+  it('DISMISS_DRIFT sets schemaDrift to false', () => {
+    const withDrift = queryReducer(initialState, { type: 'SCHEMA_DRIFT_DETECTED' });
+    const dismissed = queryReducer(withDrift, { type: 'DISMISS_DRIFT' });
+    expect(dismissed.schemaDrift).toBe(false);
+  });
+
+  it('SET_URL resets sharedFingerprint and schemaDrift', () => {
+    const withShare = queryReducer(initialState, {
+      type: 'SET_SHARED_FINGERPRINT',
+      fingerprint: 'abc12345',
+    });
+    const withDrift = queryReducer(withShare, { type: 'SCHEMA_DRIFT_DETECTED' });
+    const after = queryReducer(withDrift, {
+      type: 'SET_URL',
+      url: 'https://new.example.com/b.parquet',
+    });
+    expect(after.sharedFingerprint).toBeNull();
+    expect(after.schemaDrift).toBe(false);
+  });
+});

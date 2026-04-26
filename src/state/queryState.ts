@@ -16,6 +16,8 @@ export interface QueryState {
   rowCount: number;
   schema: ColumnInfo[] | null;
   schemaStatus: SchemaStatus;
+  sharedFingerprint: string | null;
+  schemaDrift: boolean;
 }
 
 export type QueryAction =
@@ -31,7 +33,10 @@ export type QueryAction =
   | { type: 'RESET' }
   | { type: 'SCHEMA_START' }
   | { type: 'SCHEMA_DONE'; columns: ColumnInfo[] }
-  | { type: 'SCHEMA_ERROR' };
+  | { type: 'SCHEMA_ERROR' }
+  | { type: 'SET_SHARED_FINGERPRINT'; fingerprint: string }
+  | { type: 'SCHEMA_DRIFT_DETECTED' }
+  | { type: 'DISMISS_DRIFT' };
 
 export const initialState: QueryState = {
   parquetURL: '',
@@ -42,6 +47,8 @@ export const initialState: QueryState = {
   rowCount: 0,
   schema: null,
   schemaStatus: 'idle',
+  sharedFingerprint: null,
+  schemaDrift: false,
 };
 
 export function queryReducer(state: QueryState, action: QueryAction): QueryState {
@@ -55,6 +62,8 @@ export function queryReducer(state: QueryState, action: QueryAction): QueryState
         error: null,
         schema: null,
         schemaStatus: 'idle',
+        sharedFingerprint: null,
+        schemaDrift: false,
       };
 
     case 'SET_QUERY':
@@ -92,6 +101,15 @@ export function queryReducer(state: QueryState, action: QueryAction): QueryState
 
     case 'SCHEMA_ERROR':
       return { ...state, schemaStatus: 'error' };
+
+    case 'SET_SHARED_FINGERPRINT':
+      return { ...state, sharedFingerprint: action.fingerprint };
+
+    case 'SCHEMA_DRIFT_DETECTED':
+      return { ...state, schemaDrift: true };
+
+    case 'DISMISS_DRIFT':
+      return { ...state, schemaDrift: false };
 
     default:
       return state;
