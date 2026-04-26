@@ -1,6 +1,6 @@
 import type { MainToWorker, WorkerToMain } from '@/workers/protocol';
 import type { QueryHandle, QueryOpts, Batch, QuerySummary } from './types';
-import { QueryCancelledError, QueryError, WorkerError } from '@/errors';
+import { QueryCancelledError, QueryError, WorkerCrashError } from '@/errors';
 
 type WorkerFactory = () => Worker;
 
@@ -11,6 +11,7 @@ class QueryHandleImpl implements QueryHandle {
   private _batches: Batch[] = [];
   private _doneResolve!: (s: QuerySummary) => void;
   private _doneReject!: (e: Error) => void;
+  private _startedAt = Date.now();
   readonly done: Promise<QuerySummary>;
 
   constructor(
@@ -32,7 +33,7 @@ class QueryHandleImpl implements QueryHandle {
     if (rows.length > 0) this._batches.push({ rows });
     if (isDone) {
       const rowCount = this._batches.reduce((n, b) => n + b.rows.length, 0);
-      this._doneResolve({ rowCount, durationMs: 0 });
+      this._doneResolve({ rowCount, durationMs: Date.now() - this._startedAt });
     }
   }
 
@@ -60,8 +61,11 @@ export class EngineClient {
   private readyPromise: Promise<void>;
   private readyResolve!: () => void;
   private readyReject!: (e: Error) => void;
+  private crashError: WorkerCrashError | null = null;
+  private readonly initCorrelationId: string;
 
   constructor(workerFactory?: WorkerFactory) {
+    this.initCorrelationId = crypto.randomUUID();
     this.readyPromise = new Promise<void>((res, rej) => {
       this.readyResolve = res;
       this.readyReject = rej;
@@ -76,7 +80,7 @@ export class EngineClient {
 
     this.worker.postMessage({
       kind: 'init',
-      correlationId: 'init-0',
+      correlationId: this.initCorrelationId,
       config: { maxMemoryMB: 1024 },
     } satisfies MainToWorker);
   }
@@ -104,8 +108,9 @@ export class EngineClient {
               : new QueryError(msg.error.message);
           handle._receiveError(err);
           this.pending.delete(msg.correlationId);
-        } else if (msg.correlationId === 'init-0') {
-          this.readyReject(new WorkerError(msg.error.message));
+        } else if (msg.correlationId === this.initCorrelationId) {
+          this.crashError = new WorkerCrashError(msg.error.message);
+          this.readyReject(this.crashError);
         }
         break;
       }
@@ -117,15 +122,17 @@ export class EngineClient {
   }
 
   private _handleWorkerError(e: ErrorEvent): void {
-    const err = new WorkerError(`DuckDB worker crashed: ${e.message}`);
+    this.crashError = new WorkerCrashError(`DuckDB worker crashed: ${e.message}`);
     for (const handle of this.pending.values()) {
-      handle._receiveError(err);
+      handle._receiveError(this.crashError);
     }
     this.pending.clear();
   }
 
   async runQuery(sql: string, _opts: QueryOpts = {}): Promise<QueryHandle> {
+    if (this.crashError) throw this.crashError;
     await this.readyPromise;
+    if (this.crashError) throw this.crashError;
     const id = crypto.randomUUID();
 
     const handle = new QueryHandleImpl(id, () => {

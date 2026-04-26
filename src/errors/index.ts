@@ -61,3 +61,17 @@ export class QueryCancelledError extends AppError {
     this.name = 'QueryCancelledError';
   }
 }
+
+export class WorkerCrashError extends AppError {
+  constructor(message: string, cause?: unknown) {
+    super('WORKER_CRASH', message, cause);
+    this.name = 'WorkerCrashError';
+  }
+}
+
+export class RangeFetchError extends AppError {
+  constructor(message: string, cause?: unknown) {
+    super('RANGE_FETCH_FAILED', message, cause);
+    this.name = 'RangeFetchError';
+  }
+}

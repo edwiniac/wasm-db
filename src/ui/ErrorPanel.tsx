@@ -1,11 +1,12 @@
 import type { AppError } from '@/errors';
+import { userFacingMessage } from './errorMessages';
 
 interface ErrorPanelProps {
   error: AppError;
 }
 
 export function ErrorPanel({ error }: ErrorPanelProps) {
-  const text = `[${error.code}] ${error.message}`;
+  const text = userFacingMessage(error.code, error.message);
 
   function handleCopy() {
     navigator.clipboard.writeText(text).catch(() => undefined);

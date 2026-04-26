@@ -2,6 +2,7 @@ import { useCallback, useRef, useEffect } from 'react';
 import { useQueryStore } from '@/state/store';
 import { getEngine, getTransport, shutdownEngine, loadSchema } from '@/state/queryService';
 import { AppError, TransportError, QueryError, QueryCancelledError } from '@/errors';
+import { logger } from '@/util/logger';
 import { URLInput } from '@/ui/URLInput';
 import { SQLEditor } from '@/ui/SQLEditor';
 import { ResultsTable } from '@/ui/ResultsTable';
@@ -23,24 +24,28 @@ export default function App() {
 
   const cancelRef = useRef<(() => void) | null>(null);
   const probeAbortRef = useRef<AbortController | null>(null);
+  const activeHandleRef = useRef<QueryHandle | null>(null);
 
   // Shutdown worker on unmount
   useEffect(() => () => shutdownEngine(), []);
 
-  // Sync URL from hash param on mount
+  // Sync URL from hash param on mount — only accept http(s) to block js:/data: injection
   useEffect(() => {
     const hash = window.location.hash.slice(1);
     const params = new URLSearchParams(hash);
     const url = params.get('url');
-    if (url) dispatch({ type: 'SET_URL', url });
+    if (url && /^https?:\/\//i.test(url)) dispatch({ type: 'SET_URL', url });
   }, [dispatch]);
 
-  // When URL changes, update the parquet_scan URL in-place — preserves user edits
+  // When URL changes, update the parquet_scan URL in-place — preserves user edits.
+  // Escape single quotes so URLs like "it's.parquet" produce valid SQL.
   useEffect(() => {
     if (!parquetURL) return;
+    const safe = parquetURL.replace(/'/g, "''");
+    // Use a function replacer to avoid interpreting '$' in the URL as a regex back-reference.
     const next = queryText
-      .replace('__URL__', parquetURL)
-      .replace(/parquet_scan\('[^']*'\)/g, `parquet_scan('${parquetURL}')`);
+      .replace('__URL__', safe)
+      .replace(/parquet_scan\('[^']*'\)/g, () => `parquet_scan('${safe}')`);
     if (next !== queryText) dispatch({ type: 'SET_QUERY', sql: next });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parquetURL]);
@@ -57,7 +62,10 @@ export default function App() {
       dispatch({ type: 'SCHEMA_START' });
       loadSchema(parquetURL)
         .then((columns) => dispatch({ type: 'SCHEMA_DONE', columns }))
-        .catch(() => dispatch({ type: 'SCHEMA_ERROR' }));
+        .catch((err) => {
+          logger.warn('Schema fetch failed', err);
+          dispatch({ type: 'SCHEMA_ERROR' });
+        });
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       dispatch({
@@ -70,11 +78,16 @@ export default function App() {
   }, [parquetURL, dispatch]);
 
   const handleRun = useCallback(async () => {
+    // Cancel any in-flight query before starting a new one to prevent interleaved results
+    // and lost cancel handles.
+    activeHandleRef.current?.cancel();
+    activeHandleRef.current = null;
+
     dispatch({ type: 'QUERY_START' });
-    let handle: QueryHandle | null = null;
     try {
-      handle = await getEngine().runQuery(queryText);
-      cancelRef.current = () => handle?.cancel();
+      const handle = await getEngine().runQuery(queryText);
+      activeHandleRef.current = handle;
+      cancelRef.current = () => handle.cancel();
       let total = 0;
       for await (const batch of handle.stream) {
         dispatch({ type: 'BATCH_RECEIVED', batch });
@@ -88,13 +101,16 @@ export default function App() {
         error: err instanceof AppError ? err : new QueryError(String(err)),
       });
     } finally {
+      activeHandleRef.current = null;
       cancelRef.current = null;
     }
   }, [queryText, dispatch]);
 
   const handleCancel = useCallback(() => {
     probeAbortRef.current?.abort();
-    cancelRef.current?.();
+    activeHandleRef.current?.cancel();
+    activeHandleRef.current = null;
+    cancelRef.current = null;
     dispatch({ type: 'CANCEL' });
   }, [dispatch]);
 

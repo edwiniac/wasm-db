@@ -14,11 +14,23 @@ function post(msg: WorkerToMain): void {
 }
 
 async function handleInit(correlationId: string, config: DuckDBWorkerConfig): Promise<void> {
+  if (db !== null) {
+    // Already initialised — ignore duplicate init (e.g. React StrictMode double-mount)
+    post({ kind: 'ready', correlationId });
+    return;
+  }
   try {
     configMemoryMB = config.maxMemoryMB;
     const bundle = await duckdb.selectBundle(BUNDLES);
 
-    const worker = new Worker(bundle.mainWorker!, { type: 'classic' });
+    // COEP require-corp blocks cross-origin worker scripts; wrap in a blob URL
+    // so the nested DuckDB worker appears same-origin.
+    const workerBlob = new Blob([`importScripts("${bundle.mainWorker!}");`], {
+      type: 'text/javascript',
+    });
+    const workerUrl = URL.createObjectURL(workerBlob);
+    const worker = new Worker(workerUrl);
+    URL.revokeObjectURL(workerUrl);
     const logger = new duckdb.VoidLogger();
     db = new duckdb.AsyncDuckDB(logger, worker);
 

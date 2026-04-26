@@ -33,9 +33,13 @@ export function SchemaTree({ columns, status }: SchemaTreeProps) {
     >
       <div style={{ color: '#888', marginBottom: '4px' }}>Columns ({columns.length})</div>
       {columns.map((col) => (
-        <div key={col.name} style={{ display: 'flex', gap: '8px', padding: '2px 0' }}>
+        <div
+          key={col.name}
+          style={{ display: 'flex', gap: '8px', padding: '2px 0', alignItems: 'baseline' }}
+        >
           <span style={{ color: '#9cdcfe' }}>{col.name}</span>
           <span style={{ color: '#888', fontSize: '12px' }}>{col.type}</span>
+          {col.nullable && <span style={{ color: '#666', fontSize: '11px' }}>NULL</span>}
         </div>
       ))}
     </div>

@@ -12,7 +12,9 @@ export class IndexedDBCache implements ICache {
 
   async get(key: CacheKey): Promise<Uint8Array | null> {
     const cacheKey = keyString(key);
-    const chunks = await this.db.chunks.where('cacheKey').equals(cacheKey).sortBy('chunkIndex');
+    const chunks = await this.db.transaction('r', this.db.chunks, () =>
+      this.db.chunks.where('cacheKey').equals(cacheKey).sortBy('chunkIndex'),
+    );
     if (chunks.length === 0) return null;
     return joinChunks(chunks.map((c) => c.data));
   }

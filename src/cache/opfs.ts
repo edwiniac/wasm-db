@@ -1,18 +1,25 @@
 import type { ICache, CacheKey } from './types';
 import { logger } from '@/util/logger';
 
-function fnv1a32(str: string): number {
-  let h = 2166136261;
+// 64-bit FNV-1a via two 32-bit halves to avoid birthday collisions in the 32-bit space.
+function fnv1a64hex(str: string): string {
+  let hi = 2166136261;
+  let lo = 0;
   for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
+    const c = str.charCodeAt(i);
+    lo ^= c;
+    // Multiply (hi:lo) by FNV prime 16777619 as two 32-bit words
+    const newLo = Math.imul(lo, 16777619) >>> 0;
+    const newHi = (Math.imul(hi, 16777619) + Math.imul(lo, 0)) >>> 0;
+    lo = newLo;
+    hi = newHi;
   }
-  return h >>> 0;
+  return hi.toString(16).padStart(8, '0') + lo.toString(16).padStart(8, '0');
 }
 
 function keyToFilename(key: CacheKey): string {
   const raw = `${key.url}::${key.etag ?? ''}::${key.lastModified ?? ''}`;
-  return `${fnv1a32(raw).toString(16)}-${key.start}-${key.end}`;
+  return `${fnv1a64hex(raw)}-${key.start}-${key.end}`;
 }
 
 export class OPFSCache implements ICache {
@@ -22,7 +29,11 @@ export class OPFSCache implements ICache {
     if (!this.dirPromise) {
       this.dirPromise = navigator.storage
         .getDirectory()
-        .then((root) => root.getDirectoryHandle('wasm-db-cache', { create: true }));
+        .then((root) => root.getDirectoryHandle('wasm-db-cache', { create: true }))
+        .catch((err) => {
+          this.dirPromise = null; // allow retry on next call
+          throw err;
+        });
     }
     return this.dirPromise;
   }
