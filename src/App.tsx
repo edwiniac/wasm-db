@@ -3,12 +3,15 @@ import { useQueryStore } from '@/state/store';
 import { getEngine, getTransport, shutdownEngine, loadSchema } from '@/state/queryService';
 import { AppError, TransportError, QueryError, QueryCancelledError } from '@/errors';
 import { logger } from '@/util/logger';
+import { decodeShareParams, computeFingerprint } from '@/util/sharing';
 import { URLInput } from '@/ui/URLInput';
 import { SQLEditor } from '@/ui/SQLEditor';
 import { ResultsTable } from '@/ui/ResultsTable';
 import { StatusBar } from '@/ui/StatusBar';
 import { ErrorPanel } from '@/ui/ErrorPanel';
 import { SchemaTree } from '@/ui/SchemaTree';
+import { ShareButton } from '@/ui/ShareButton';
+import { DriftBanner } from '@/ui/DriftBanner';
 import type { QueryHandle } from '@/state/queryService';
 
 export default function App() {
@@ -20,24 +23,71 @@ export default function App() {
   const rowCount = useQueryStore((s) => s.rowCount);
   const schema = useQueryStore((s) => s.schema);
   const schemaStatus = useQueryStore((s) => s.schemaStatus);
+  const sharedFingerprint = useQueryStore((s) => s.sharedFingerprint);
+  const schemaDrift = useQueryStore((s) => s.schemaDrift);
   const dispatch = useQueryStore((s) => s.dispatch);
 
   const cancelRef = useRef<(() => void) | null>(null);
   const probeAbortRef = useRef<AbortController | null>(null);
   const activeHandleRef = useRef<QueryHandle | null>(null);
 
-  // Shutdown worker on unmount
   useEffect(() => () => shutdownEngine(), []);
 
-  // Sync URL from hash param on mount — only accept http(s) to block js:/data: injection
-  useEffect(() => {
-    const hash = window.location.hash.slice(1);
-    const params = new URLSearchParams(hash);
-    const url = params.get('url');
-    if (url && /^https?:\/\//i.test(url)) dispatch({ type: 'SET_URL', url });
-  }, [dispatch]);
+  // urlOverride: used by mount auto-probe to bypass the stale parquetURL closure.
+  // storedFingerprint: undefined → use sharedFingerprint from closure;
+  //   explicit value (even null) → use that value directly.
+  const handleProbe = useCallback(
+    async (urlOverride?: string, storedFingerprint?: string | null) => {
+      const targetURL = urlOverride ?? parquetURL;
+      const fingerprintToCheck =
+        storedFingerprint !== undefined ? storedFingerprint : sharedFingerprint;
 
-  // When URL changes, update the parquet_scan URL in-place — preserves user edits.
+      probeAbortRef.current?.abort();
+      const controller = new AbortController();
+      probeAbortRef.current = controller;
+      dispatch({ type: 'PROBE_START' });
+      try {
+        await getTransport().probeURL(targetURL, controller.signal);
+        dispatch({ type: 'PROBE_DONE' });
+        dispatch({ type: 'SCHEMA_START' });
+        loadSchema(targetURL)
+          .then((columns) => {
+            dispatch({ type: 'SCHEMA_DONE', columns });
+            if (fingerprintToCheck) {
+              const live = computeFingerprint(columns);
+              if (live !== fingerprintToCheck) dispatch({ type: 'SCHEMA_DRIFT_DETECTED' });
+            }
+          })
+          .catch((err) => {
+            logger.warn('Schema fetch failed', err);
+            dispatch({ type: 'SCHEMA_ERROR' });
+          });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        dispatch({
+          type: 'ERROR',
+          error: err instanceof AppError ? err : new TransportError(String(err)),
+        });
+      } finally {
+        probeAbortRef.current = null;
+      }
+    },
+    [parquetURL, sharedFingerprint, dispatch],
+  );
+
+  // Auto-load from shared URL hash on mount — runs once.
+  // handleProbe intentionally excluded from deps to prevent re-running on re-renders.
+  useEffect(() => {
+    const { url, query, fingerprint } = decodeShareParams(window.location.hash);
+    if (!url) return;
+    dispatch({ type: 'SET_URL', url });
+    if (query) dispatch({ type: 'SET_QUERY', sql: query });
+    if (fingerprint) dispatch({ type: 'SET_SHARED_FINGERPRINT', fingerprint });
+    void handleProbe(url, fingerprint);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Update parquet_scan URL in-place when parquetURL changes — preserves user edits.
   // Escape single quotes so URLs like "it's.parquet" produce valid SQL.
   useEffect(() => {
     if (!parquetURL) return;
@@ -49,33 +99,6 @@ export default function App() {
     if (next !== queryText) dispatch({ type: 'SET_QUERY', sql: next });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parquetURL]);
-
-  const handleProbe = useCallback(async () => {
-    probeAbortRef.current?.abort();
-    const controller = new AbortController();
-    probeAbortRef.current = controller;
-    dispatch({ type: 'PROBE_START' });
-    try {
-      await getTransport().probeURL(parquetURL, controller.signal);
-      dispatch({ type: 'PROBE_DONE' });
-      // Fire schema fetch in background — probe returns to idle immediately
-      dispatch({ type: 'SCHEMA_START' });
-      loadSchema(parquetURL)
-        .then((columns) => dispatch({ type: 'SCHEMA_DONE', columns }))
-        .catch((err) => {
-          logger.warn('Schema fetch failed', err);
-          dispatch({ type: 'SCHEMA_ERROR' });
-        });
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      dispatch({
-        type: 'ERROR',
-        error: err instanceof AppError ? err : new TransportError(String(err)),
-      });
-    } finally {
-      probeAbortRef.current = null;
-    }
-  }, [parquetURL, dispatch]);
 
   const handleRun = useCallback(async () => {
     // Cancel any in-flight query before starting a new one to prevent interleaved results
@@ -115,6 +138,7 @@ export default function App() {
   }, [dispatch]);
 
   const isExecuting = status === 'executing' || status === 'probing';
+  const liveFingerprint = schema ? computeFingerprint(schema) : null;
 
   return (
     <div
@@ -131,8 +155,17 @@ export default function App() {
         value={parquetURL}
         status={status}
         onChange={(url) => dispatch({ type: 'SET_URL', url })}
-        onProbe={handleProbe}
+        onProbe={() => void handleProbe()}
       />
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 12px 4px' }}>
+        <ShareButton
+          parquetURL={parquetURL}
+          queryText={queryText}
+          fingerprint={liveFingerprint}
+          disabled={isExecuting || !parquetURL.trim()}
+        />
+      </div>
+      <DriftBanner visible={schemaDrift} onDismiss={() => dispatch({ type: 'DISMISS_DRIFT' })} />
       <SchemaTree columns={schema} status={schemaStatus} />
       <div style={{ padding: '0 12px 8px' }}>
         <SQLEditor
