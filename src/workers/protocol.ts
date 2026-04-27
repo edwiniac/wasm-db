@@ -19,7 +19,7 @@ export type MainToWorker =
   | { kind: 'shutdown'; correlationId: string };
 
 export type WorkerToMain =
-  | { kind: 'ready'; correlationId: string }
+  | { kind: 'ready'; correlationId: string; spillActive: boolean }
   | { kind: 'batch'; correlationId: string; rows: Record<string, unknown>[]; done: boolean }
   | { kind: 'error'; correlationId: string; error: SerializedError }
   | { kind: 'progress'; correlationId: string; stage: string; pct: number };

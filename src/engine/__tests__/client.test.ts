@@ -43,7 +43,7 @@ describe('EngineClient', () => {
     const { EngineClient } = await import('@/engine/client');
     const client = new EngineClient(() => mockWorker as unknown as Worker);
 
-    mockWorker.simulateMessage({ kind: 'ready', correlationId: 'init-0' });
+    mockWorker.simulateMessage({ kind: 'ready', correlationId: 'init-0', spillActive: false });
 
     const handle = await client.runQuery('SELECT 1');
 
@@ -59,7 +59,7 @@ describe('EngineClient', () => {
     const { EngineClient } = await import('@/engine/client');
     const client = new EngineClient(() => mockWorker as unknown as Worker);
 
-    mockWorker.simulateMessage({ kind: 'ready', correlationId: 'init-0' });
+    mockWorker.simulateMessage({ kind: 'ready', correlationId: 'init-0', spillActive: false });
 
     const handle = await client.runQuery('SELECT 42 AS n');
     const queryMsg = mockWorker.postMessage.mock.calls.find(
@@ -83,7 +83,7 @@ describe('EngineClient', () => {
     const { EngineClient } = await import('@/engine/client');
     const client = new EngineClient(() => mockWorker as unknown as Worker);
 
-    mockWorker.simulateMessage({ kind: 'ready', correlationId: 'init-0' });
+    mockWorker.simulateMessage({ kind: 'ready', correlationId: 'init-0', spillActive: false });
 
     const handle = await client.runQuery('INVALID SQL');
     const queryMsg = mockWorker.postMessage.mock.calls.find(
@@ -105,7 +105,7 @@ describe('EngineClient', () => {
     const { EngineClient } = await import('@/engine/client');
     const client = new EngineClient(() => mockWorker as unknown as Worker);
 
-    mockWorker.simulateMessage({ kind: 'ready', correlationId: 'init-0' });
+    mockWorker.simulateMessage({ kind: 'ready', correlationId: 'init-0', spillActive: false });
 
     const handle = await client.runQuery('SELECT sleep(10)');
     handle.cancel();
@@ -123,5 +123,29 @@ describe('EngineClient', () => {
 
     client.shutdown();
     expect(mockWorker.terminate).toHaveBeenCalled();
+  });
+
+  describe('EngineClient — spillActive', () => {
+    it('spillActive is true when ready message has spillActive: true', async () => {
+      vi.resetModules();
+      const { EngineClient } = await import('@/engine/client');
+      const client = new EngineClient(() => mockWorker as unknown as Worker);
+
+      mockWorker.simulateMessage({ kind: 'ready', correlationId: 'init-0', spillActive: true });
+
+      expect(client.spillActive).toBe(true);
+      client.shutdown();
+    });
+
+    it('spillActive is false when ready message has spillActive: false', async () => {
+      vi.resetModules();
+      const { EngineClient } = await import('@/engine/client');
+      const client = new EngineClient(() => mockWorker as unknown as Worker);
+
+      mockWorker.simulateMessage({ kind: 'ready', correlationId: 'init-0', spillActive: false });
+
+      expect(client.spillActive).toBe(false);
+      client.shutdown();
+    });
   });
 });

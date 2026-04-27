@@ -44,7 +44,7 @@ describe('MainToWorker protocol', () => {
 
 describe('WorkerToMain protocol', () => {
   it('ready message has correlationId', () => {
-    const msg: WorkerToMain = { kind: 'ready', correlationId: 'init-0' };
+    const msg: WorkerToMain = { kind: 'ready', correlationId: 'init-0', spillActive: false };
     expect(msg.kind).toBe('ready');
   });
 

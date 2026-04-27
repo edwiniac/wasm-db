@@ -63,6 +63,11 @@ export class EngineClient {
   private readyReject!: (e: Error) => void;
   private crashError: WorkerCrashError | null = null;
   private readonly initCorrelationId: string;
+  private _spillActive = false;
+
+  get spillActive(): boolean {
+    return this._spillActive;
+  }
 
   constructor(workerFactory?: WorkerFactory) {
     this.initCorrelationId = crypto.randomUUID();
@@ -88,6 +93,7 @@ export class EngineClient {
   private _handleMessage(msg: WorkerToMain): void {
     switch (msg.kind) {
       case 'ready':
+        this._spillActive = msg.spillActive;
         this.readyResolve();
         break;
 

@@ -1,6 +1,8 @@
 /// <reference lib="webworker" />
 import * as duckdb from '@duckdb/duckdb-wasm';
 import type { MainToWorker, WorkerToMain, DuckDBWorkerConfig } from './protocol';
+import { hasOPFS } from '@/util/featureDetect';
+import { workerLogger } from '@/util/logger';
 
 const BUNDLES = duckdb.getJsDelivrBundles();
 
@@ -16,7 +18,7 @@ function post(msg: WorkerToMain): void {
 async function handleInit(correlationId: string, config: DuckDBWorkerConfig): Promise<void> {
   if (db !== null) {
     // Already initialised — ignore duplicate init (e.g. React StrictMode double-mount)
-    post({ kind: 'ready', correlationId });
+    post({ kind: 'ready', correlationId, spillActive: false });
     return;
   }
   try {
@@ -39,7 +41,17 @@ async function handleInit(correlationId: string, config: DuckDBWorkerConfig): Pr
     conn = await db.connect();
     await conn.query(`SET memory_limit='${config.maxMemoryMB}MB'`);
 
-    post({ kind: 'ready', correlationId });
+    let spillActive = false;
+    if (await hasOPFS()) {
+      try {
+        await conn.query(`SET temp_directory='opfs://duckdb-tmp'`);
+        spillActive = true;
+      } catch (err) {
+        workerLogger.warn('OPFS spill setup failed — running without disk spill', err);
+      }
+    }
+
+    post({ kind: 'ready', correlationId, spillActive });
   } catch (err) {
     post({
       kind: 'error',
