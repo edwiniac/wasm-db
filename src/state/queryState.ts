@@ -18,6 +18,7 @@ export interface QueryState {
   schemaStatus: SchemaStatus;
   sharedFingerprint: string | null;
   schemaDrift: boolean;
+  spillActive: boolean;
 }
 
 export type QueryAction =
@@ -36,7 +37,8 @@ export type QueryAction =
   | { type: 'SCHEMA_ERROR' }
   | { type: 'SET_SHARED_FINGERPRINT'; fingerprint: string }
   | { type: 'SCHEMA_DRIFT_DETECTED' }
-  | { type: 'DISMISS_DRIFT' };
+  | { type: 'DISMISS_DRIFT' }
+  | { type: 'SET_SPILL_ACTIVE'; active: boolean };
 
 export const initialState: QueryState = {
   parquetURL: '',
@@ -49,6 +51,7 @@ export const initialState: QueryState = {
   schemaStatus: 'idle',
   sharedFingerprint: null,
   schemaDrift: false,
+  spillActive: false,
 };
 
 export function queryReducer(state: QueryState, action: QueryAction): QueryState {
@@ -110,6 +113,9 @@ export function queryReducer(state: QueryState, action: QueryAction): QueryState
 
     case 'DISMISS_DRIFT':
       return { ...state, schemaDrift: false };
+
+    case 'SET_SPILL_ACTIVE':
+      return { ...state, spillActive: action.active };
 
     default:
       return state;

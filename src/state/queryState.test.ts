@@ -70,3 +70,16 @@ describe('queryReducer — sharing actions', () => {
     expect(after.schemaDrift).toBe(false);
   });
 });
+
+describe('queryReducer — spill actions', () => {
+  it('SET_SPILL_ACTIVE sets spillActive to true', () => {
+    const next = queryReducer(initialState, { type: 'SET_SPILL_ACTIVE', active: true });
+    expect(next.spillActive).toBe(true);
+  });
+
+  it('SET_SPILL_ACTIVE sets spillActive to false', () => {
+    const withSpill = queryReducer(initialState, { type: 'SET_SPILL_ACTIVE', active: true });
+    const next = queryReducer(withSpill, { type: 'SET_SPILL_ACTIVE', active: false });
+    expect(next.spillActive).toBe(false);
+  });
+});
