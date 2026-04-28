@@ -129,6 +129,59 @@ async function handleCancel(_correlationId: string, target: string): Promise<voi
   });
 }
 
+async function handleRegisterFile(
+  correlationId: string,
+  alias: string,
+  url: string,
+): Promise<void> {
+  if (!conn) {
+    post({
+      kind: 'error',
+      correlationId,
+      error: { code: 'WORKER_ERROR', message: 'Worker not initialised — send init first' },
+    });
+    return;
+  }
+  try {
+    const safeUrl = url.replace(/'/g, "''");
+    await conn.query(`CREATE OR REPLACE VIEW ${alias} AS SELECT * FROM parquet_scan('${safeUrl}')`);
+    post({ kind: 'batch', correlationId, rows: [], done: true });
+  } catch (err) {
+    post({
+      kind: 'error',
+      correlationId,
+      error: {
+        code: 'QUERY_ERROR',
+        message: err instanceof Error ? err.message : String(err),
+      },
+    });
+  }
+}
+
+async function handleUnregisterFile(correlationId: string, alias: string): Promise<void> {
+  if (!conn) {
+    post({
+      kind: 'error',
+      correlationId,
+      error: { code: 'WORKER_ERROR', message: 'Worker not initialised — send init first' },
+    });
+    return;
+  }
+  try {
+    await conn.query(`DROP VIEW IF EXISTS ${alias}`);
+    post({ kind: 'batch', correlationId, rows: [], done: true });
+  } catch (err) {
+    post({
+      kind: 'error',
+      correlationId,
+      error: {
+        code: 'QUERY_ERROR',
+        message: err instanceof Error ? err.message : String(err),
+      },
+    });
+  }
+}
+
 async function handleShutdown(): Promise<void> {
   try {
     await conn?.close();
@@ -152,6 +205,12 @@ self.addEventListener('message', (event: MessageEvent<MainToWorker>) => {
       break;
     case 'shutdown':
       void handleShutdown();
+      break;
+    case 'register_file':
+      void handleRegisterFile(msg.correlationId, msg.alias, msg.url);
+      break;
+    case 'unregister_file':
+      void handleUnregisterFile(msg.correlationId, msg.alias);
       break;
   }
 });
