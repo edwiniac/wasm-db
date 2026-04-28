@@ -16,7 +16,9 @@ export type MainToWorker =
   | { kind: 'init'; correlationId: string; config: DuckDBWorkerConfig }
   | { kind: 'query'; correlationId: string; sql: string; opts: QueryOpts }
   | { kind: 'cancel'; correlationId: string; target: string }
-  | { kind: 'shutdown'; correlationId: string };
+  | { kind: 'shutdown'; correlationId: string }
+  | { kind: 'register_file'; correlationId: string; alias: string; url: string }
+  | { kind: 'unregister_file'; correlationId: string; alias: string };
 
 export type WorkerToMain =
   | { kind: 'ready'; correlationId: string; spillActive: boolean }

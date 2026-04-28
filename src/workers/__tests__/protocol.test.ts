@@ -40,6 +40,26 @@ describe('MainToWorker protocol', () => {
     };
     expect(msg.kind).toBe('shutdown');
   });
+
+  it('register_file message has alias and url', () => {
+    const msg: MainToWorker = {
+      kind: 'register_file',
+      correlationId: 'rf-1',
+      alias: 'sales',
+      url: 'http://x.com/sales.parquet',
+    };
+    expect(msg.alias).toBe('sales');
+    expect(msg.url).toBe('http://x.com/sales.parquet');
+  });
+
+  it('unregister_file message has alias', () => {
+    const msg: MainToWorker = {
+      kind: 'unregister_file',
+      correlationId: 'uf-1',
+      alias: 'sales',
+    };
+    expect(msg.alias).toBe('sales');
+  });
 });
 
 describe('WorkerToMain protocol', () => {
