@@ -4,6 +4,7 @@ interface StatusBarProps {
   status: QueryStatus;
   rowCount: number;
   onCancel: () => void;
+  spillActive?: boolean;
 }
 
 const LABEL: Record<QueryStatus, string> = {
@@ -14,7 +15,7 @@ const LABEL: Record<QueryStatus, string> = {
   error: 'Error',
 };
 
-export function StatusBar({ status, rowCount, onCancel }: StatusBarProps) {
+export function StatusBar({ status, rowCount, onCancel, spillActive }: StatusBarProps) {
   const inFlight = status === 'probing' || status === 'executing';
   const label =
     status === 'done'
@@ -48,6 +49,15 @@ export function StatusBar({ status, rowCount, onCancel }: StatusBarProps) {
         />
       )}
       <span>{label}</span>
+      {spillActive && (
+        <span
+          style={{ fontSize: '11px', color: '#7db9e8', marginLeft: '4px' }}
+          title="DuckDB is using OPFS for temporary query data"
+          aria-label="disk spill active"
+        >
+          ⚡ disk spill
+        </span>
+      )}
       {inFlight && (
         <button
           onClick={onCancel}

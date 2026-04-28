@@ -31,6 +31,10 @@ export function shutdownEngine(): void {
   engine = null;
 }
 
+export function getSpillActive(): boolean {
+  return engine?.spillActive ?? false;
+}
+
 export async function loadSchema(url: string): Promise<ColumnInfo[]> {
   return fetchSchema(url, getEngine());
 }

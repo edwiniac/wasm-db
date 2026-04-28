@@ -1,6 +1,12 @@
 import { useCallback, useRef, useEffect } from 'react';
 import { useQueryStore } from '@/state/store';
-import { getEngine, getTransport, shutdownEngine, loadSchema } from '@/state/queryService';
+import {
+  getEngine,
+  getTransport,
+  shutdownEngine,
+  loadSchema,
+  getSpillActive,
+} from '@/state/queryService';
 import { AppError, TransportError, QueryError, QueryCancelledError } from '@/errors';
 import { logger } from '@/util/logger';
 import { decodeShareParams, computeFingerprint } from '@/util/sharing';
@@ -25,6 +31,7 @@ export default function App() {
   const schemaStatus = useQueryStore((s) => s.schemaStatus);
   const sharedFingerprint = useQueryStore((s) => s.sharedFingerprint);
   const schemaDrift = useQueryStore((s) => s.schemaDrift);
+  const spillActive = useQueryStore((s) => s.spillActive);
   const dispatch = useQueryStore((s) => s.dispatch);
 
   const cancelRef = useRef<(() => void) | null>(null);
@@ -53,6 +60,7 @@ export default function App() {
         loadSchema(targetURL)
           .then((columns) => {
             dispatch({ type: 'SCHEMA_DONE', columns });
+            dispatch({ type: 'SET_SPILL_ACTIVE', active: getSpillActive() });
             if (fingerprintToCheck) {
               const live = computeFingerprint(columns);
               if (live !== fingerprintToCheck) dispatch({ type: 'SCHEMA_DRIFT_DETECTED' });
@@ -187,7 +195,12 @@ export default function App() {
       </div>
       {error && <ErrorPanel error={error} />}
       <ResultsTable batches={results} rowCount={rowCount} />
-      <StatusBar status={status} rowCount={rowCount} onCancel={handleCancel} />
+      <StatusBar
+        status={status}
+        rowCount={rowCount}
+        onCancel={handleCancel}
+        spillActive={spillActive}
+      />
     </div>
   );
 }
