@@ -35,6 +35,14 @@ export function getSpillActive(): boolean {
   return engine?.spillActive ?? false;
 }
 
+export function registerFile(alias: string, url: string): Promise<void> {
+  return getEngine().registerFile(alias, url);
+}
+
+export function unregisterFile(alias: string): Promise<void> {
+  return getEngine().unregisterFile(alias);
+}
+
 export async function loadSchema(url: string): Promise<ColumnInfo[]> {
   return fetchSchema(url, getEngine());
 }
