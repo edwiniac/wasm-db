@@ -53,10 +53,7 @@ export function FilePanel({
           {files.map((file) => {
             const otherAliases = files.filter((f) => f.id !== file.id).map((f) => f.alias);
             const aliasError = file.alias ? validateAlias(file.alias, otherAliases) : null;
-            const probeDisabled =
-              file.status === 'probing' ||
-              !file.url.trim() ||
-              !!validateAlias(file.alias, otherAliases);
+            const probeDisabled = file.status === 'probing' || !file.url.trim() || !!aliasError;
 
             return (
               <div

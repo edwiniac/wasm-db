@@ -148,6 +148,14 @@ export class EngineClient {
       handle._receiveError(this.crashError);
     }
     this.pending.clear();
+    this._drainPendingVoid(this.crashError);
+  }
+
+  private _drainPendingVoid(err: Error): void {
+    for (const { reject } of this.pendingVoid.values()) {
+      reject(err);
+    }
+    this.pendingVoid.clear();
   }
 
   async runQuery(sql: string, _opts: QueryOpts = {}): Promise<QueryHandle> {
@@ -212,6 +220,7 @@ export class EngineClient {
       kind: 'shutdown',
       correlationId: crypto.randomUUID(),
     } satisfies MainToWorker);
+    this._drainPendingVoid(new WorkerCrashError('Worker shut down'));
     this.worker.terminate();
   }
 }
