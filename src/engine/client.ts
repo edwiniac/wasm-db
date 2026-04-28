@@ -63,6 +63,7 @@ export class EngineClient {
   private readyReject!: (e: Error) => void;
   private crashError: WorkerCrashError | null = null;
   private readonly initCorrelationId: string;
+  private pendingVoid = new Map<string, { resolve: () => void; reject: (e: Error) => void }>();
   private _spillActive = false;
 
   get spillActive(): boolean {
@@ -98,6 +99,14 @@ export class EngineClient {
         break;
 
       case 'batch': {
+        const voidEntry = this.pendingVoid.get(msg.correlationId);
+        if (voidEntry) {
+          if (msg.done) {
+            voidEntry.resolve();
+            this.pendingVoid.delete(msg.correlationId);
+          }
+          return;
+        }
         const handle = this.pending.get(msg.correlationId);
         if (!handle) return;
         handle._receiveBatch(msg.rows, msg.done);
@@ -106,6 +115,12 @@ export class EngineClient {
       }
 
       case 'error': {
+        const voidEntry = this.pendingVoid.get(msg.correlationId);
+        if (voidEntry) {
+          voidEntry.reject(new QueryError(msg.error.message));
+          this.pendingVoid.delete(msg.correlationId);
+          return;
+        }
         const handle = this.pending.get(msg.correlationId);
         if (handle) {
           const err =
@@ -159,6 +174,37 @@ export class EngineClient {
     } satisfies MainToWorker);
 
     return handle;
+  }
+
+  async registerFile(alias: string, url: string): Promise<void> {
+    if (this.crashError) throw this.crashError;
+    await this.readyPromise;
+    if (this.crashError) throw this.crashError;
+    const id = crypto.randomUUID();
+    return new Promise<void>((resolve, reject) => {
+      this.pendingVoid.set(id, { resolve, reject });
+      this.worker.postMessage({
+        kind: 'register_file',
+        correlationId: id,
+        alias,
+        url,
+      } satisfies MainToWorker);
+    });
+  }
+
+  async unregisterFile(alias: string): Promise<void> {
+    if (this.crashError) throw this.crashError;
+    await this.readyPromise;
+    if (this.crashError) throw this.crashError;
+    const id = crypto.randomUUID();
+    return new Promise<void>((resolve, reject) => {
+      this.pendingVoid.set(id, { resolve, reject });
+      this.worker.postMessage({
+        kind: 'unregister_file',
+        correlationId: id,
+        alias,
+      } satisfies MainToWorker);
+    });
   }
 
   shutdown(): void {

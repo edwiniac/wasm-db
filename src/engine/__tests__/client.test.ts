@@ -149,3 +149,81 @@ describe('EngineClient', () => {
     });
   });
 });
+
+describe('EngineClient — registerFile / unregisterFile', () => {
+  beforeEach(() => {
+    mockWorker = new MockWorker();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('registerFile resolves when worker acks with empty batch', async () => {
+    vi.resetModules();
+    const { EngineClient } = await import('@/engine/client');
+    const client = new EngineClient(() => mockWorker as unknown as Worker);
+    mockWorker.simulateMessage({ kind: 'ready', correlationId: 'init-0', spillActive: false });
+
+    const promise = client.registerFile('sales', 'http://x.com/sales.parquet');
+
+    await Promise.resolve(); // flush microtask: await readyPromise inside registerFile
+    const regMsg = mockWorker.postMessage.mock.calls.find(
+      (c) => (c[0] as { kind: string }).kind === 'register_file',
+    )![0] as { correlationId: string };
+    mockWorker.simulateMessage({
+      kind: 'batch',
+      correlationId: regMsg.correlationId,
+      rows: [],
+      done: true,
+    });
+
+    await expect(promise).resolves.toBeUndefined();
+    client.shutdown();
+  });
+
+  it('registerFile rejects on error from worker', async () => {
+    vi.resetModules();
+    const { EngineClient } = await import('@/engine/client');
+    const client = new EngineClient(() => mockWorker as unknown as Worker);
+    mockWorker.simulateMessage({ kind: 'ready', correlationId: 'init-0', spillActive: false });
+
+    const promise = client.registerFile('bad', 'http://x.com/bad.parquet');
+
+    await Promise.resolve(); // flush microtask: await readyPromise inside registerFile
+    const regMsg = mockWorker.postMessage.mock.calls.find(
+      (c) => (c[0] as { kind: string }).kind === 'register_file',
+    )![0] as { correlationId: string };
+    mockWorker.simulateMessage({
+      kind: 'error',
+      correlationId: regMsg.correlationId,
+      error: { code: 'QUERY_ERROR', message: 'file not found' },
+    });
+
+    await expect(promise).rejects.toThrow('file not found');
+    client.shutdown();
+  });
+
+  it('unregisterFile resolves when worker acks with empty batch', async () => {
+    vi.resetModules();
+    const { EngineClient } = await import('@/engine/client');
+    const client = new EngineClient(() => mockWorker as unknown as Worker);
+    mockWorker.simulateMessage({ kind: 'ready', correlationId: 'init-0', spillActive: false });
+
+    const promise = client.unregisterFile('sales');
+
+    await Promise.resolve(); // flush microtask: await readyPromise inside unregisterFile
+    const unregMsg = mockWorker.postMessage.mock.calls.find(
+      (c) => (c[0] as { kind: string }).kind === 'unregister_file',
+    )![0] as { correlationId: string };
+    mockWorker.simulateMessage({
+      kind: 'batch',
+      correlationId: unregMsg.correlationId,
+      rows: [],
+      done: true,
+    });
+
+    await expect(promise).resolves.toBeUndefined();
+    client.shutdown();
+  });
+});
