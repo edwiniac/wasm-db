@@ -19,6 +19,7 @@ export interface QueryState {
   sharedFingerprint: string | null;
   schemaDrift: boolean;
   spillActive: boolean;
+  isOnline: boolean;
 }
 
 export type QueryAction =
@@ -38,7 +39,8 @@ export type QueryAction =
   | { type: 'SET_SHARED_FINGERPRINT'; fingerprint: string }
   | { type: 'SCHEMA_DRIFT_DETECTED' }
   | { type: 'DISMISS_DRIFT' }
-  | { type: 'SET_SPILL_ACTIVE'; active: boolean };
+  | { type: 'SET_SPILL_ACTIVE'; active: boolean }
+  | { type: 'SET_ONLINE'; online: boolean };
 
 export const initialState: QueryState = {
   parquetURL: '',
@@ -52,6 +54,7 @@ export const initialState: QueryState = {
   sharedFingerprint: null,
   schemaDrift: false,
   spillActive: false,
+  isOnline: true,
 };
 
 export function queryReducer(state: QueryState, action: QueryAction): QueryState {
@@ -116,6 +119,9 @@ export function queryReducer(state: QueryState, action: QueryAction): QueryState
 
     case 'SET_SPILL_ACTIVE':
       return { ...state, spillActive: action.active };
+
+    case 'SET_ONLINE':
+      return { ...state, isOnline: action.online };
 
     default:
       return state;

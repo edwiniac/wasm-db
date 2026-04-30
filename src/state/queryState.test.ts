@@ -83,3 +83,16 @@ describe('queryReducer — spill actions', () => {
     expect(next.spillActive).toBe(false);
   });
 });
+
+describe('queryReducer — online actions', () => {
+  it('SET_ONLINE false sets isOnline to false', () => {
+    const next = queryReducer(initialState, { type: 'SET_ONLINE', online: false });
+    expect(next.isOnline).toBe(false);
+  });
+
+  it('SET_ONLINE true restores isOnline to true', () => {
+    const offline = queryReducer(initialState, { type: 'SET_ONLINE', online: false });
+    const next = queryReducer(offline, { type: 'SET_ONLINE', online: true });
+    expect(next.isOnline).toBe(true);
+  });
+});
