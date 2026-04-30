@@ -6,7 +6,10 @@ import {
   shutdownEngine,
   loadSchema,
   getSpillActive,
+  registerFile,
+  unregisterFile,
 } from '@/state/queryService';
+import { useFilesStore } from '@/state/filesStore';
 import { AppError, TransportError, QueryError, QueryCancelledError } from '@/errors';
 import { logger } from '@/util/logger';
 import { decodeShareParams, computeFingerprint } from '@/util/sharing';
@@ -18,6 +21,7 @@ import { ErrorPanel } from '@/ui/ErrorPanel';
 import { SchemaTree } from '@/ui/SchemaTree';
 import { ShareButton } from '@/ui/ShareButton';
 import { DriftBanner } from '@/ui/DriftBanner';
+import { FilePanel } from '@/ui/FilePanel';
 import type { QueryHandle } from '@/state/queryService';
 
 export default function App() {
@@ -34,11 +38,23 @@ export default function App() {
   const spillActive = useQueryStore((s) => s.spillActive);
   const dispatch = useQueryStore((s) => s.dispatch);
 
+  const files = useFilesStore((s) => s.files);
+  const filesDispatch = useFilesStore((s) => s.filesDispatch);
+
   const cancelRef = useRef<(() => void) | null>(null);
   const probeAbortRef = useRef<AbortController | null>(null);
   const activeHandleRef = useRef<QueryHandle | null>(null);
 
   useEffect(() => () => shutdownEngine(), []);
+
+  // On mount, re-register files that were persisted as ready (DuckDB views are gone after reload).
+  useEffect(() => {
+    const readyFiles = files.filter((f) => f.status === 'ready');
+    for (const f of readyFiles) {
+      void registerFile(f.alias, f.url);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // urlOverride: used by mount auto-probe to bypass the stale parquetURL closure.
   // storedFingerprint: undefined → use sharedFingerprint from closure;
@@ -145,6 +161,35 @@ export default function App() {
     dispatch({ type: 'CANCEL' });
   }, [dispatch]);
 
+  const handleProbeFile = useCallback(
+    async (id: string) => {
+      const file = files.find((f) => f.id === id);
+      if (!file) return;
+      filesDispatch({ type: 'FILE_PROBE_START', id });
+      try {
+        const controller = new AbortController();
+        await getTransport().probeURL(file.url, controller.signal);
+        await registerFile(file.alias, file.url);
+        filesDispatch({ type: 'FILE_PROBE_DONE', id });
+      } catch {
+        filesDispatch({ type: 'FILE_PROBE_ERROR', id });
+      }
+    },
+    [files, filesDispatch],
+  );
+
+  const handleRemoveFile = useCallback(
+    (id: string) => {
+      const file = files.find((f) => f.id === id);
+      if (!file) return;
+      if (file.status === 'ready') {
+        void unregisterFile(file.alias);
+      }
+      filesDispatch({ type: 'REMOVE_FILE', id });
+    },
+    [files, filesDispatch],
+  );
+
   const isExecuting = status === 'executing' || status === 'probing';
   const liveFingerprint = schema ? computeFingerprint(schema) : null;
 
@@ -174,6 +219,14 @@ export default function App() {
         />
       </div>
       <DriftBanner visible={schemaDrift} onDismiss={() => dispatch({ type: 'DISMISS_DRIFT' })} />
+      <FilePanel
+        files={files}
+        onAdd={() => filesDispatch({ type: 'ADD_FILE', id: crypto.randomUUID() })}
+        onRemove={handleRemoveFile}
+        onChangeAlias={(id, alias) => filesDispatch({ type: 'UPDATE_FILE_ALIAS', id, alias })}
+        onChangeUrl={(id, url) => filesDispatch({ type: 'UPDATE_FILE_URL', id, url })}
+        onProbe={handleProbeFile}
+      />
       <SchemaTree columns={schema} status={schemaStatus} />
       <div style={{ padding: '0 12px 8px' }}>
         <SQLEditor
