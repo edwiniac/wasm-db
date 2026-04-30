@@ -26,9 +26,11 @@ function isShellPath(pathname) {
 // Pre-cache shell assets on install.
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) => cache.addAll(['/', '/index.html'])),
+    caches
+      .open(SHELL_CACHE)
+      .then((cache) => cache.addAll(['/', '/index.html']))
+      .then(() => self.skipWaiting()),
   );
-  self.skipWaiting();
 });
 
 // Remove stale caches on activate.
@@ -69,9 +71,16 @@ async function serveShell(request) {
   const cache = await caches.open(SHELL_CACHE);
   const hit = await cache.match(request);
   if (hit) return hit;
-  const response = await fetch(request);
-  if (response.ok) cache.put(request, response.clone());
-  return response;
+  try {
+    const response = await fetch(request);
+    if (response.ok) cache.put(request, response.clone());
+    return response;
+  } catch {
+    return new Response('Service Unavailable — reload when online', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain' },
+    });
+  }
 }
 
 async function serveRange(request, rangeHeader) {
@@ -79,9 +88,16 @@ async function serveRange(request, rangeHeader) {
   const cache = await caches.open(CACHE_NAME);
   const hit = await cache.match(cacheKey);
   if (hit) return hit;
-  const response = await fetch(request);
-  if (response.status === 206 || response.status === 200) {
-    cache.put(cacheKey, response.clone());
+  try {
+    const response = await fetch(request);
+    if (response.status === 206 || response.status === 200) {
+      cache.put(cacheKey, response.clone());
+    }
+    return response;
+  } catch {
+    return new Response('Range unavailable — not in cache', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain' },
+    });
   }
-  return response;
 }
