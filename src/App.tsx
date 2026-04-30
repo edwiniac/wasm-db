@@ -36,6 +36,7 @@ export default function App() {
   const sharedFingerprint = useQueryStore((s) => s.sharedFingerprint);
   const schemaDrift = useQueryStore((s) => s.schemaDrift);
   const spillActive = useQueryStore((s) => s.spillActive);
+  const isOnline = useQueryStore((s) => s.isOnline);
   const dispatch = useQueryStore((s) => s.dispatch);
 
   const files = useFilesStore((s) => s.files);
@@ -253,6 +254,7 @@ export default function App() {
         rowCount={rowCount}
         onCancel={handleCancel}
         spillActive={spillActive}
+        isOnline={isOnline}
       />
     </div>
   );
