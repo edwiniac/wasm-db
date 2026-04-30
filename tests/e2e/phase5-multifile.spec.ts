@@ -12,7 +12,7 @@ test.describe('Phase 5 — multi-file joins', () => {
 
   test('panel body is visible by default and hides on toggle', async ({ page }) => {
     await page.goto('/');
-    const panel = page.getByLabel('Additional files panel');
+    const panel = page.getByLabel('Additional files panel', { exact: true });
     await expect(panel).toBeVisible();
     await page.getByRole('button', { name: /toggle additional files panel/i }).click();
     await expect(panel).not.toBeVisible();
