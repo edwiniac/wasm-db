@@ -67,6 +67,7 @@ export function StatusBar({
       )}
       {!isOnline && (
         <span
+          role="status"
           style={{ fontSize: '11px', color: '#ff4d4d', marginLeft: '4px' }}
           aria-label="offline"
         >
