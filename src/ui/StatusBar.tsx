@@ -5,6 +5,7 @@ interface StatusBarProps {
   rowCount: number;
   onCancel: () => void;
   spillActive?: boolean;
+  isOnline?: boolean;
 }
 
 const LABEL: Record<QueryStatus, string> = {
@@ -15,7 +16,13 @@ const LABEL: Record<QueryStatus, string> = {
   error: 'Error',
 };
 
-export function StatusBar({ status, rowCount, onCancel, spillActive }: StatusBarProps) {
+export function StatusBar({
+  status,
+  rowCount,
+  onCancel,
+  spillActive,
+  isOnline = true,
+}: StatusBarProps) {
   const inFlight = status === 'probing' || status === 'executing';
   const label =
     status === 'done'
@@ -56,6 +63,14 @@ export function StatusBar({ status, rowCount, onCancel, spillActive }: StatusBar
           aria-label="disk spill active"
         >
           ⚡ disk spill
+        </span>
+      )}
+      {!isOnline && (
+        <span
+          style={{ fontSize: '11px', color: '#ff4d4d', marginLeft: '4px' }}
+          aria-label="offline"
+        >
+          ● offline
         </span>
       )}
       {inFlight && (
