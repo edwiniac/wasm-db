@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import { SchemaTree } from '@/ui/SchemaTree';
 import type { ColumnInfo } from '@/state/queryState';
 
@@ -35,5 +35,19 @@ describe('SchemaTree', () => {
   it('shows column count in header', () => {
     render(<SchemaTree columns={cols} status="loaded" />);
     expect(screen.getByText(/columns \(2\)/i)).toBeInTheDocument();
+  });
+});
+
+describe('SchemaTree — onColumnClick', () => {
+  it('calls onColumnClick with the column name when a row is clicked', () => {
+    const onColumnClick = vi.fn();
+    render(<SchemaTree columns={cols} status="loaded" onColumnClick={onColumnClick} />);
+    fireEvent.click(screen.getByText('id'));
+    expect(onColumnClick).toHaveBeenCalledWith('id');
+  });
+
+  it('does not throw when onColumnClick is omitted and a row is clicked', () => {
+    render(<SchemaTree columns={cols} status="loaded" />);
+    expect(() => fireEvent.click(screen.getByText('id'))).not.toThrow();
   });
 });
