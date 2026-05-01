@@ -7,9 +7,10 @@ const MAX_DISPLAY_ROWS = 500;
 interface ResultsTableProps {
   batches: Batch[];
   rowCount: number;
+  onCellClick?: (columnName: string, value: unknown) => void;
 }
 
-export function ResultsTable({ batches, rowCount }: ResultsTableProps) {
+export function ResultsTable({ batches, rowCount, onCellClick }: ResultsTableProps) {
   const rows = useMemo(() => {
     const all: Record<string, unknown>[] = [];
     for (const batch of batches) {
@@ -81,10 +82,14 @@ export function ResultsTable({ batches, rowCount }: ResultsTableProps) {
               {row.getVisibleCells().map((cell) => (
                 <td
                   key={cell.id}
+                  onClick={
+                    onCellClick ? () => onCellClick(cell.column.id, cell.getValue()) : undefined
+                  }
                   style={{
                     padding: '4px 10px',
                     borderBottom: '1px solid #2a2a2a',
                     whiteSpace: 'nowrap',
+                    cursor: onCellClick ? 'pointer' : 'default',
                   }}
                 >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
