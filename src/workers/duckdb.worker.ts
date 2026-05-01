@@ -65,10 +65,28 @@ async function handleInit(correlationId: string, config: DuckDBWorkerConfig): Pr
   }
 }
 
+function deepSerialize(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'bigint') return String(value);
+  if (typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string')
+    return value;
+  if (Array.isArray(value)) return value.map(deepSerialize);
+  if (typeof value === 'object') {
+    // Arrow List/Vector types expose toArray() — convert before recursing
+    if ('toArray' in value && typeof (value as Record<string, unknown>)['toArray'] === 'function') {
+      return (value as { toArray: () => unknown[] }).toArray().map(deepSerialize);
+    }
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, deepSerialize(v)]),
+    );
+  }
+  return String(value);
+}
+
 function sanitizeRow(row: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(row)) {
-    out[k] = typeof v === 'bigint' ? String(v) : v;
+    out[k] = deepSerialize(v);
   }
   return out;
 }
