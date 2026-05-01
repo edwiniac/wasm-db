@@ -151,3 +151,91 @@ describe('ResultsTable — sorting', () => {
     expect(headers[1]).toHaveTextContent('⇅');
   });
 });
+
+describe('ResultsTable — global filter', () => {
+  it('renders the filter input with placeholder "Filter rows…"', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    expect(screen.getByPlaceholderText('Filter rows…')).toBeInTheDocument();
+  });
+
+  it('hides rows that do not match the filter', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    const input = screen.getByPlaceholderText('Filter rows…');
+    fireEvent.change(input, { target: { value: 'Paris' } });
+    expect(screen.queryByText('Berlin')).not.toBeInTheDocument();
+    expect(screen.getByText('Paris')).toBeInTheDocument();
+  });
+
+  it('shows "1 of 2 rows" label when filter narrows results', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    const input = screen.getByPlaceholderText('Filter rows…');
+    fireEvent.change(input, { target: { value: 'Paris' } });
+    expect(screen.getByText(/1 of 2/)).toBeInTheDocument();
+  });
+
+  it('shows total row count with no "of" when filter is empty', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    expect(screen.getByText(/^2 rows$/)).toBeInTheDocument();
+  });
+});
+
+describe('ResultsTable — copy cell chip', () => {
+  it('copy chip is not visible when no cell is hovered', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    expect(screen.queryByRole('button', { name: /copy cell value/i })).not.toBeInTheDocument();
+  });
+
+  it('copy chip appears when a data cell is hovered', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    const cells = screen.getAllByRole('cell');
+    fireEvent.mouseEnter(cells[2]!);
+    expect(screen.getByRole('button', { name: /copy cell value/i })).toBeInTheDocument();
+  });
+
+  it('copy chip is hidden when mouse leaves the cell', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    const cells = screen.getAllByRole('cell');
+    fireEvent.mouseEnter(cells[2]!);
+    fireEvent.mouseLeave(cells[2]!);
+    expect(screen.queryByRole('button', { name: /copy cell value/i })).not.toBeInTheDocument();
+  });
+
+  it('clicking Copy chip calls navigator.clipboard.writeText with the raw value', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    const cells = screen.getAllByRole('cell');
+    fireEvent.mouseEnter(cells[2]!);
+    const copyBtn = screen.getByRole('button', { name: /copy cell value/i });
+    fireEvent.click(copyBtn);
+
+    expect(writeText).toHaveBeenCalledWith('Paris');
+    vi.unstubAllGlobals();
+  });
+
+  it('copy chip does NOT appear on the # row-number cell', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    const cells = screen.getAllByRole('cell');
+    fireEvent.mouseEnter(cells[0]!);
+    expect(screen.queryByRole('button', { name: /copy cell value/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('ResultsTable — export buttons', () => {
+  it('renders ↓ CSV button when rows are present', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    expect(screen.getByRole('button', { name: /export csv/i })).toBeInTheDocument();
+  });
+
+  it('renders ↓ JSON button when rows are present', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    expect(screen.getByRole('button', { name: /export json/i })).toBeInTheDocument();
+  });
+
+  it('does not render export buttons when there are no rows', () => {
+    render(<ResultsTable batches={[]} rowCount={0} />);
+    expect(screen.queryByRole('button', { name: /export csv/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /export json/i })).not.toBeInTheDocument();
+  });
+});
