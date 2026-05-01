@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 import { useQueryStore } from '@/state/store';
 import {
   getEngine,
@@ -12,17 +12,15 @@ import {
 import { useFilesStore } from '@/state/filesStore';
 import { AppError, TransportError, QueryError, QueryCancelledError } from '@/errors';
 import { logger } from '@/util/logger';
-import { decodeShareParams, computeFingerprint } from '@/util/sharing';
-import { URLInput } from '@/ui/URLInput';
+import { decodeShareParams, computeFingerprint, encodeShareURL } from '@/util/sharing';
+import { Topbar } from '@/ui/Topbar';
+import { Sidebar } from '@/ui/Sidebar';
 import { SQLEditor, type SQLEditorHandle } from '@/ui/SQLEditor';
 import { buildWhereClause } from '@/util/querySnippets';
 import { ResultsTable } from '@/ui/ResultsTable';
 import { StatusBar } from '@/ui/StatusBar';
 import { ErrorPanel } from '@/ui/ErrorPanel';
-import { SchemaTree } from '@/ui/SchemaTree';
-import { ShareButton } from '@/ui/ShareButton';
 import { DriftBanner } from '@/ui/DriftBanner';
-import { FilePanel } from '@/ui/FilePanel';
 import type { QueryHandle } from '@/state/queryService';
 
 export default function App() {
@@ -47,6 +45,8 @@ export default function App() {
   const probeAbortRef = useRef<AbortController | null>(null);
   const activeHandleRef = useRef<QueryHandle | null>(null);
   const editorRef = useRef<SQLEditorHandle>(null);
+
+  const [shareLabel, setShareLabel] = useState('Share');
 
   useEffect(() => () => shutdownEngine(), []);
 
@@ -175,6 +175,18 @@ export default function App() {
     [queryText],
   );
 
+  const handleShare = useCallback(async () => {
+    const liveFingerprint = schema ? computeFingerprint(schema) : null;
+    const url = encodeShareURL(parquetURL, queryText, liveFingerprint);
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareLabel('Copied!');
+    } catch {
+      setShareLabel('Copy failed');
+    }
+    setTimeout(() => setShareLabel('Share'), 1500);
+  }, [parquetURL, queryText, schema]);
+
   const handleProbeFile = useCallback(
     async (id: string) => {
       const file = files.find((f) => f.id === id);
@@ -196,16 +208,13 @@ export default function App() {
     (id: string) => {
       const file = files.find((f) => f.id === id);
       if (!file) return;
-      if (file.status === 'ready') {
-        void unregisterFile(file.alias);
-      }
+      if (file.status === 'ready') void unregisterFile(file.alias);
       filesDispatch({ type: 'REMOVE_FILE', id });
     },
     [files, filesDispatch],
   );
 
   const isExecuting = status === 'executing' || status === 'probing';
-  const liveFingerprint = schema ? computeFingerprint(schema) : null;
 
   return (
     <div
@@ -213,56 +222,108 @@ export default function App() {
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
-        background: '#111',
-        color: '#e0e0e0',
+        background: 'var(--bg-base)',
+        color: 'var(--text-primary)',
         fontFamily: 'system-ui, sans-serif',
+        overflow: 'hidden',
       }}
     >
-      <URLInput
-        value={parquetURL}
-        status={status}
-        onChange={(url) => dispatch({ type: 'SET_URL', url })}
-        onProbe={() => void handleProbe()}
+      {/* Top bar — full width */}
+      <Topbar
+        url={parquetURL}
+        isProbing={status === 'probing'}
+        onUrlChange={(url) => dispatch({ type: 'SET_URL', url })}
+        onLoad={() => void handleProbe()}
+        onShare={() => void handleShare()}
+        shareLabel={shareLabel}
+        shareDisabled={isExecuting}
       />
-      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 12px 4px' }}>
-        <ShareButton
-          parquetURL={parquetURL}
-          queryText={queryText}
-          fingerprint={liveFingerprint}
-          disabled={isExecuting || !parquetURL.trim()}
-        />
-      </div>
+
+      {/* DriftBanner — full width, below topbar */}
       <DriftBanner visible={schemaDrift} onDismiss={() => dispatch({ type: 'DISMISS_DRIFT' })} />
-      <FilePanel
-        files={files}
-        onAdd={() => filesDispatch({ type: 'ADD_FILE', id: crypto.randomUUID() })}
-        onRemove={handleRemoveFile}
-        onChangeAlias={(id, alias) => filesDispatch({ type: 'UPDATE_FILE_ALIAS', id, alias })}
-        onChangeUrl={(id, url) => filesDispatch({ type: 'UPDATE_FILE_URL', id, url })}
-        onProbe={handleProbeFile}
-      />
-      <SchemaTree columns={schema} status={schemaStatus} onColumnClick={handleColumnClick} />
-      <div style={{ padding: '0 12px 8px' }}>
-        <SQLEditor
-          ref={editorRef}
-          value={queryText}
-          disabled={isExecuting}
-          onChange={(sql) => dispatch({ type: 'SET_QUERY', sql })}
-          onRun={handleRun}
+
+      {/* Body: sidebar + main pane */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {/* Left: Sidebar */}
+        <Sidebar
+          columns={schema}
+          schemaStatus={schemaStatus}
+          onColumnClick={handleColumnClick}
+          files={files}
+          onAddFile={() => filesDispatch({ type: 'ADD_FILE', id: crypto.randomUUID() })}
+          onRemoveFile={handleRemoveFile}
+          onChangeAlias={(id, alias) => filesDispatch({ type: 'UPDATE_FILE_ALIAS', id, alias })}
+          onChangeUrl={(id, url) => filesDispatch({ type: 'UPDATE_FILE_URL', id, url })}
+          onProbeFile={handleProbeFile}
         />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
-          <button
-            onClick={handleRun}
-            disabled={isExecuting || !parquetURL.trim()}
-            aria-label="Run query"
-            style={{ padding: '6px 16px' }}
+
+        {/* Right: editor + results */}
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            minWidth: 0,
+          }}
+        >
+          {/* SQL Editor */}
+          <div
+            style={{
+              padding: '10px 12px 6px',
+              background: 'var(--bg-editor)',
+              borderBottom: '1px solid var(--border)',
+              flexShrink: 0,
+            }}
           >
-            {status === 'executing' ? 'Running…' : 'Run'}
-          </button>
+            <SQLEditor
+              ref={editorRef}
+              value={queryText}
+              disabled={isExecuting}
+              onChange={(sql) => dispatch({ type: 'SET_QUERY', sql })}
+              onRun={handleRun}
+            />
+          </div>
+
+          {/* Run toolbar */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              padding: '6px 12px',
+              background: 'var(--bg-elevated)',
+              borderBottom: '1px solid var(--border)',
+              flexShrink: 0,
+            }}
+          >
+            <button
+              onClick={handleRun}
+              disabled={isExecuting || !parquetURL.trim()}
+              aria-label="Run query"
+              style={{
+                padding: '5px 18px',
+                background: isExecuting ? 'var(--bg-surface)' : 'var(--accent)',
+                color: isExecuting ? 'var(--text-muted)' : '#fff',
+                border: 'none',
+                borderRadius: 'var(--radius)',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: isExecuting ? 'default' : 'pointer',
+              }}
+            >
+              {status === 'executing' ? 'Running…' : '▶ Run'}
+            </button>
+          </div>
+
+          {/* Error panel */}
+          {error && <ErrorPanel error={error} />}
+
+          {/* Results */}
+          <ResultsTable batches={results} rowCount={rowCount} onCellClick={handleCellClick} />
         </div>
       </div>
-      {error && <ErrorPanel error={error} />}
-      <ResultsTable batches={results} rowCount={rowCount} onCellClick={handleCellClick} />
+
+      {/* Status bar — full width */}
       <StatusBar
         status={status}
         rowCount={rowCount}
