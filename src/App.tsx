@@ -303,7 +303,7 @@ export default function App() {
               style={{
                 padding: '5px 18px',
                 background: isExecuting ? 'var(--bg-surface)' : 'var(--accent)',
-                color: isExecuting ? 'var(--text-muted)' : '#fff',
+                color: isExecuting ? 'var(--text-muted)' : 'var(--text-primary)',
                 border: 'none',
                 borderRadius: 'var(--radius)',
                 fontSize: '13px',

@@ -71,7 +71,7 @@ export function Topbar({
         style={{
           padding: '5px 14px',
           background: loadDisabled ? 'var(--bg-surface)' : 'var(--accent)',
-          color: loadDisabled ? 'var(--text-muted)' : '#fff',
+          color: loadDisabled ? 'var(--text-muted)' : 'var(--text-primary)',
           border: 'none',
           borderRadius: 'var(--radius)',
           fontSize: '13px',
