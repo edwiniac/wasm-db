@@ -110,3 +110,44 @@ describe('ResultsTable — cell type rendering', () => {
     expect(cell.textContent!.length).toBeLessThanOrEqual(62); // 60 chars + '…'
   });
 });
+
+describe('ResultsTable — sorting', () => {
+  it('renders ⇅ sort indicator on data column headers by default', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    const headers = screen.getAllByRole('columnheader');
+    expect(headers[1]).toHaveTextContent('⇅');
+    expect(headers[2]).toHaveTextContent('⇅');
+  });
+
+  it('does NOT render a sort indicator on the # column', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    const headers = screen.getAllByRole('columnheader');
+    expect(headers[0]).not.toHaveTextContent('⇅');
+    expect(headers[0]).not.toHaveTextContent('↑');
+    expect(headers[0]).not.toHaveTextContent('↓');
+  });
+
+  it('shows ↑ on the id header after one click', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    const headers = screen.getAllByRole('columnheader');
+    fireEvent.click(headers[1]!);
+    expect(headers[1]).toHaveTextContent('↑');
+  });
+
+  it('shows ↓ on the id header after two clicks', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    const headers = screen.getAllByRole('columnheader');
+    fireEvent.click(headers[1]!);
+    fireEvent.click(headers[1]!);
+    expect(headers[1]).toHaveTextContent('↓');
+  });
+
+  it('clears sort after three clicks and shows ⇅ again', () => {
+    render(<ResultsTable batches={batches} rowCount={2} />);
+    const headers = screen.getAllByRole('columnheader');
+    fireEvent.click(headers[1]!);
+    fireEvent.click(headers[1]!);
+    fireEvent.click(headers[1]!);
+    expect(headers[1]).toHaveTextContent('⇅');
+  });
+});
