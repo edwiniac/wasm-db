@@ -14,7 +14,8 @@ import { AppError, TransportError, QueryError, QueryCancelledError } from '@/err
 import { logger } from '@/util/logger';
 import { decodeShareParams, computeFingerprint } from '@/util/sharing';
 import { URLInput } from '@/ui/URLInput';
-import { SQLEditor } from '@/ui/SQLEditor';
+import { SQLEditor, type SQLEditorHandle } from '@/ui/SQLEditor';
+import { buildWhereClause } from '@/util/querySnippets';
 import { ResultsTable } from '@/ui/ResultsTable';
 import { StatusBar } from '@/ui/StatusBar';
 import { ErrorPanel } from '@/ui/ErrorPanel';
@@ -45,6 +46,7 @@ export default function App() {
   const cancelRef = useRef<(() => void) | null>(null);
   const probeAbortRef = useRef<AbortController | null>(null);
   const activeHandleRef = useRef<QueryHandle | null>(null);
+  const editorRef = useRef<SQLEditorHandle>(null);
 
   useEffect(() => () => shutdownEngine(), []);
 
@@ -162,6 +164,17 @@ export default function App() {
     dispatch({ type: 'CANCEL' });
   }, [dispatch]);
 
+  const handleColumnClick = useCallback((columnName: string) => {
+    editorRef.current?.insertAtCursor(columnName);
+  }, []);
+
+  const handleCellClick = useCallback(
+    (columnName: string, value: unknown) => {
+      editorRef.current?.insertAtCursor(buildWhereClause(columnName, value, queryText));
+    },
+    [queryText],
+  );
+
   const handleProbeFile = useCallback(
     async (id: string) => {
       const file = files.find((f) => f.id === id);
@@ -228,9 +241,10 @@ export default function App() {
         onChangeUrl={(id, url) => filesDispatch({ type: 'UPDATE_FILE_URL', id, url })}
         onProbe={handleProbeFile}
       />
-      <SchemaTree columns={schema} status={schemaStatus} />
+      <SchemaTree columns={schema} status={schemaStatus} onColumnClick={handleColumnClick} />
       <div style={{ padding: '0 12px 8px' }}>
         <SQLEditor
+          ref={editorRef}
           value={queryText}
           disabled={isExecuting}
           onChange={(sql) => dispatch({ type: 'SET_QUERY', sql })}
@@ -248,7 +262,7 @@ export default function App() {
         </div>
       </div>
       {error && <ErrorPanel error={error} />}
-      <ResultsTable batches={results} rowCount={rowCount} />
+      <ResultsTable batches={results} rowCount={rowCount} onCellClick={handleCellClick} />
       <StatusBar
         status={status}
         rowCount={rowCount}
