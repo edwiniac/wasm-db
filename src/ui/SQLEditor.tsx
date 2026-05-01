@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react';
 import { EditorView, keymap } from '@codemirror/view';
 import { Compartment, EditorState } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
@@ -13,7 +13,14 @@ interface SQLEditorProps {
   onRun: () => void;
 }
 
-export function SQLEditor({ value, disabled, onChange, onRun }: SQLEditorProps) {
+export interface SQLEditorHandle {
+  insertAtCursor: (text: string) => void;
+}
+
+export const SQLEditor = forwardRef<SQLEditorHandle, SQLEditorProps>(function SQLEditor(
+  { value, disabled, onChange, onRun },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const editableCompartment = useRef(new Compartment());
@@ -24,6 +31,19 @@ export function SQLEditor({ value, disabled, onChange, onRun }: SQLEditorProps) 
     onRunRef.current = onRun;
     onChangeRef.current = onChange;
   });
+
+  useImperativeHandle(ref, () => ({
+    insertAtCursor(text: string) {
+      const view = viewRef.current;
+      if (!view) return;
+      const from = view.state.selection.main.from;
+      view.dispatch({
+        changes: { from, insert: text },
+        selection: { anchor: from + text.length },
+      });
+      view.focus();
+    },
+  }));
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -99,4 +119,4 @@ export function SQLEditor({ value, disabled, onChange, onRun }: SQLEditorProps) 
       aria-label="SQL editor"
     />
   );
-}
+});
