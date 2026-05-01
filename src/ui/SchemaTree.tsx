@@ -14,13 +14,17 @@ export function SchemaTree({ columns, status, onColumnClick }: SchemaTreeProps) 
 
   if (status === 'loading') {
     return (
-      <div style={{ padding: '8px 12px', color: '#888', fontSize: '13px' }}>Loading schema…</div>
+      <div style={{ padding: '8px 12px', color: 'var(--text-muted)', fontSize: '12px' }}>
+        Loading schema…
+      </div>
     );
   }
 
   if (status === 'error' || !columns) {
     return (
-      <div style={{ padding: '8px 12px', color: '#f88', fontSize: '13px' }}>Schema unavailable</div>
+      <div style={{ padding: '8px 12px', color: 'var(--color-error)', fontSize: '12px' }}>
+        Schema unavailable
+      </div>
     );
   }
 
@@ -34,35 +38,41 @@ export function SchemaTree({ columns, status, onColumnClick }: SchemaTreeProps) 
     <div
       aria-label="Schema tree"
       style={{
-        padding: '8px 12px',
-        borderTop: '1px solid #333',
+        padding: '4px 0',
         overflowY: 'auto',
         maxHeight: '200px',
-        fontSize: '13px',
+        fontSize: '12px',
       }}
     >
-      <div style={{ color: '#888', marginBottom: '4px' }}>Columns ({columns.length})</div>
-      {columns.map((col) => (
-        <div
-          key={col.name}
-          data-column={col.name}
-          onClick={() => handleClick(col.name)}
-          style={{
-            display: 'flex',
-            gap: '8px',
-            padding: '2px 0',
-            alignItems: 'baseline',
-            cursor: onColumnClick ? 'pointer' : 'default',
-            background: highlighted === col.name ? '#2a3a4a' : 'transparent',
-            transition: 'background 0.15s',
-            borderRadius: '2px',
-          }}
-        >
-          <span style={{ color: '#9cdcfe' }}>{col.name}</span>
-          <span style={{ color: '#888', fontSize: '12px' }}>{col.type}</span>
-          {col.nullable && <span style={{ color: '#666', fontSize: '11px' }}>NULL</span>}
-        </div>
-      ))}
+      <div style={{ color: 'var(--text-muted)', padding: '3px 12px', fontSize: '11px' }}>
+        Columns ({columns.length})
+      </div>
+      {columns.map((col) => {
+        const isHighlighted = highlighted === col.name;
+        return (
+          <div
+            key={col.name}
+            data-column={col.name}
+            onClick={() => handleClick(col.name)}
+            style={{
+              display: 'flex',
+              gap: '6px',
+              padding: '3px 12px',
+              alignItems: 'baseline',
+              cursor: onColumnClick ? 'pointer' : 'default',
+              background: isHighlighted ? 'var(--accent-dim)' : 'transparent',
+              borderLeft: isHighlighted ? '2px solid var(--accent)' : '2px solid transparent',
+              transition: 'background 0.15s, border-color 0.15s',
+            }}
+          >
+            <span style={{ color: 'var(--text-primary)' }}>{col.name}</span>
+            <span style={{ color: 'var(--text-faint)', fontSize: '11px' }}>{col.type}</span>
+            {col.nullable && (
+              <span style={{ color: 'var(--text-faint)', fontSize: '10px' }}>NULL</span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
