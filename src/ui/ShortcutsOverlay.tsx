@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface ShortcutsOverlayProps {
   open: boolean;
@@ -14,14 +14,19 @@ const SHORTCUTS: { key: string; description: string }[] = [
 ];
 
 export function ShortcutsOverlay({ open, onClose }: ShortcutsOverlayProps) {
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     if (!open) return;
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -34,7 +39,7 @@ export function ShortcutsOverlay({ open, onClose }: ShortcutsOverlayProps) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.7)',
+        background: 'var(--overlay-backdrop)',
         zIndex: 100,
         display: 'flex',
         alignItems: 'center',

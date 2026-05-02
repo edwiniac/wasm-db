@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useHistoryStore } from '@/state/historyStore';
 import { relativeTime } from '@/util/relativeTime';
 
@@ -5,7 +6,7 @@ interface QueryHistoryProps {
   onSelect: (sql: string) => void;
 }
 
-const sectionLabelStyle: React.CSSProperties = {
+const sectionLabelStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
@@ -57,11 +58,18 @@ export function QueryHistory({ onSelect }: QueryHistoryProps) {
         {entries.map((entry) => (
           <li
             key={entry.id}
+            role="button"
+            tabIndex={0}
             onClick={() => onSelect(entry.sql)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') onSelect(entry.sql);
+            }}
             style={{
               padding: '5px 12px',
               cursor: 'pointer',
               borderBottom: '1px solid var(--border)',
+              listStyle: 'none',
+              outline: 'none',
             }}
           >
             <div
