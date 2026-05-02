@@ -11,6 +11,7 @@ interface SQLEditorProps {
   disabled: boolean;
   onChange: (sql: string) => void;
   onRun: () => void;
+  onFormat?: () => void;
 }
 
 export interface SQLEditorHandle {
@@ -18,17 +19,19 @@ export interface SQLEditorHandle {
 }
 
 export const SQLEditor = forwardRef<SQLEditorHandle, SQLEditorProps>(function SQLEditor(
-  { value, disabled, onChange, onRun },
+  { value, disabled, onChange, onRun, onFormat },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const editableCompartment = useRef(new Compartment());
   const onRunRef = useRef(onRun);
+  const onFormatRef = useRef(onFormat);
   const onChangeRef = useRef(onChange);
 
   useLayoutEffect(() => {
     onRunRef.current = onRun;
+    onFormatRef.current = onFormat;
     onChangeRef.current = onChange;
   });
 
@@ -54,6 +57,14 @@ export const SQLEditor = forwardRef<SQLEditorHandle, SQLEditorProps>(function SQ
         mac: 'Cmd-Enter',
         run: () => {
           onRunRef.current();
+          return true;
+        },
+      },
+      {
+        key: 'Ctrl-Shift-f',
+        mac: 'Cmd-Shift-f',
+        run: () => {
+          onFormatRef.current?.();
           return true;
         },
       },
