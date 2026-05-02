@@ -19,6 +19,7 @@ describe('ShortcutsOverlay', () => {
     expect(screen.getByText(/Ctrl\+Shift\+F/i)).toBeInTheDocument();
     expect(screen.getByText(/Ctrl\+L/i)).toBeInTheDocument();
     expect(screen.getByText(/Escape/i)).toBeInTheDocument();
+    expect(screen.getByText('?')).toBeInTheDocument();
   });
 
   it('calls onClose when Escape key is pressed', () => {

@@ -13,6 +13,7 @@ describe('QueryHistory', () => {
   it('renders "HISTORY (0)" when empty', () => {
     render(<QueryHistory onSelect={vi.fn()} />);
     expect(screen.getByText(/HISTORY \(0\)/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /clear/i })).not.toBeInTheDocument();
   });
 
   it('renders entry count in header', () => {
