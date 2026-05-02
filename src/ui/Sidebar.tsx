@@ -5,6 +5,7 @@ import type { ColumnStats } from '@/engine/columnStats';
 import { SchemaTree } from '@/ui/SchemaTree';
 import { FilePanel } from '@/ui/FilePanel';
 import { ColumnStatsPanel } from '@/ui/ColumnStatsPanel';
+import { QueryHistory } from '@/ui/QueryHistory';
 
 interface SidebarProps {
   columns: ColumnInfo[] | null;
@@ -18,6 +19,7 @@ interface SidebarProps {
   onChangeAlias: (id: string, alias: string) => void;
   onChangeUrl: (id: string, url: string) => void;
   onProbeFile: (id: string) => void;
+  onHistorySelect: (sql: string) => void;
 }
 
 const sectionLabelStyle: React.CSSProperties = {
@@ -58,6 +60,7 @@ export function Sidebar({
   onChangeAlias,
   onChangeUrl,
   onProbeFile,
+  onHistorySelect,
 }: SidebarProps) {
   const [filterState, setFilterState] = useState<{ columns: ColumnInfo[] | null; value: string }>({
     columns,
@@ -116,6 +119,9 @@ export function Sidebar({
       />
 
       <ColumnStatsPanel stats={columnStats} loading={columnStatsLoading} />
+
+      <div style={dividerStyle} />
+      <QueryHistory onSelect={onHistorySelect} />
     </div>
   );
 }

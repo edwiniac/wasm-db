@@ -18,6 +18,7 @@ const defaultProps = {
   onChangeAlias: vi.fn(),
   onChangeUrl: vi.fn(),
   onProbeFile: vi.fn(),
+  onHistorySelect: vi.fn(),
 };
 
 describe('Sidebar', () => {
@@ -72,5 +73,10 @@ describe('Sidebar', () => {
     render(<Sidebar {...defaultProps} columnStats={stats} />);
     expect(screen.getByText('weight')).toBeInTheDocument();
     expect(screen.getByText('min')).toBeInTheDocument();
+  });
+
+  it('renders HISTORY section via QueryHistory', () => {
+    render(<Sidebar {...defaultProps} />);
+    expect(screen.getByText(/HISTORY \(0\)/i)).toBeInTheDocument();
   });
 });
