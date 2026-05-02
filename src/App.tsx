@@ -15,9 +15,12 @@ import { useFilesStore } from '@/state/filesStore';
 import { AppError, TransportError, QueryError, QueryCancelledError } from '@/errors';
 import { logger } from '@/util/logger';
 import { decodeShareParams, computeFingerprint, encodeShareURL } from '@/util/sharing';
+import { formatSql } from '@/util/formatSql';
+import { useHistoryStore } from '@/state/historyStore';
 import { Topbar } from '@/ui/Topbar';
 import { Sidebar } from '@/ui/Sidebar';
 import { SQLEditor, type SQLEditorHandle } from '@/ui/SQLEditor';
+import { ShortcutsOverlay } from '@/ui/ShortcutsOverlay';
 import { buildWhereClause } from '@/util/querySnippets';
 import { ResultsTable } from '@/ui/ResultsTable';
 import { StatusBar } from '@/ui/StatusBar';
@@ -49,8 +52,10 @@ export default function App() {
   const statsAbortRef = useRef<AbortController | null>(null);
   const activeHandleRef = useRef<QueryHandle | null>(null);
   const editorRef = useRef<SQLEditorHandle>(null);
+  const urlInputRef = useRef<HTMLInputElement>(null);
 
   const [shareLabel, setShareLabel] = useState('Share');
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   useEffect(() => () => shutdownEngine(), []);
 
@@ -147,6 +152,7 @@ export default function App() {
         total += batch.rows.length;
       }
       dispatch({ type: 'QUERY_DONE', rowCount: total });
+      useHistoryStore.getState().addEntry(queryText, total);
     } catch (err) {
       if (err instanceof QueryCancelledError) return;
       dispatch({
@@ -209,6 +215,11 @@ export default function App() {
     setTimeout(() => setShareLabel('Share'), 1500);
   }, [parquetURL, queryText, schema]);
 
+  const handleFormatSql = useCallback(() => {
+    const formatted = formatSql(queryText);
+    dispatch({ type: 'SET_QUERY', sql: formatted });
+  }, [queryText, dispatch]);
+
   const handleProbeFile = useCallback(
     async (id: string) => {
       const file = files.find((f) => f.id === id);
@@ -238,6 +249,40 @@ export default function App() {
 
   const isExecuting = status === 'executing' || status === 'probing';
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const isMac = navigator.platform.toLowerCase().includes('mac');
+      const ctrlOrCmd = isMac ? e.metaKey : e.ctrlKey;
+
+      if (ctrlOrCmd && e.key === 'l') {
+        e.preventDefault();
+        urlInputRef.current?.focus();
+        urlInputRef.current?.select();
+        return;
+      }
+
+      if (e.key === 'Escape' && (status === 'executing' || status === 'probing')) {
+        handleCancel();
+        return;
+      }
+
+      if (e.key === '?') {
+        const active = document.activeElement;
+        if (
+          active instanceof HTMLInputElement ||
+          active instanceof HTMLTextAreaElement ||
+          active?.closest('.cm-editor') !== null
+        ) {
+          return;
+        }
+        setShowShortcuts((prev) => !prev);
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [status, handleCancel]);
+
   return (
     <div
       style={{
@@ -259,6 +304,7 @@ export default function App() {
         onShare={() => void handleShare()}
         shareLabel={shareLabel}
         shareDisabled={isExecuting}
+        inputRef={urlInputRef}
       />
 
       {/* DriftBanner — full width, below topbar */}
@@ -279,6 +325,7 @@ export default function App() {
           onChangeAlias={(id, alias) => filesDispatch({ type: 'UPDATE_FILE_ALIAS', id, alias })}
           onChangeUrl={(id, url) => filesDispatch({ type: 'UPDATE_FILE_URL', id, url })}
           onProbeFile={handleProbeFile}
+          onHistorySelect={(sql) => dispatch({ type: 'SET_QUERY', sql })}
         />
 
         {/* Right: editor + results */}
@@ -306,6 +353,7 @@ export default function App() {
               disabled={isExecuting}
               onChange={(sql) => dispatch({ type: 'SET_QUERY', sql })}
               onRun={handleRun}
+              onFormat={handleFormatSql}
             />
           </div>
 
@@ -314,12 +362,31 @@ export default function App() {
             style={{
               display: 'flex',
               justifyContent: 'flex-end',
+              alignItems: 'center',
+              gap: '8px',
               padding: '6px 12px',
               background: 'var(--bg-elevated)',
               borderBottom: '1px solid var(--border)',
               flexShrink: 0,
             }}
           >
+            <button
+              onClick={handleFormatSql}
+              disabled={isExecuting}
+              aria-label="Format SQL (Ctrl+Shift+F)"
+              title="Format SQL (Ctrl+Shift+F)"
+              style={{
+                padding: '5px 14px',
+                background: 'var(--bg-elevated)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                fontSize: '13px',
+                cursor: isExecuting ? 'default' : 'pointer',
+              }}
+            >
+              Format
+            </button>
             <button
               onClick={handleRun}
               disabled={isExecuting || !parquetURL.trim()}
@@ -355,6 +422,8 @@ export default function App() {
         spillActive={spillActive}
         isOnline={isOnline}
       />
+
+      <ShortcutsOverlay open={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </div>
   );
 }
