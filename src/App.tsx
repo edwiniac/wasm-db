@@ -58,7 +58,12 @@ export default function App() {
   const [shareLabel, setShareLabel] = useState('Share');
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  useEffect(() => () => shutdownEngine(), []);
+  useEffect(() => {
+    return () => {
+      statsAbortRef.current?.abort();
+      shutdownEngine();
+    };
+  }, []);
 
   // On mount, re-register files that were persisted as ready (DuckDB views are gone after reload).
   useEffect(() => {
@@ -216,8 +221,8 @@ export default function App() {
     setTimeout(() => setShareLabel('Share'), 1500);
   }, [parquetURL, queryText, schema]);
 
-  const handleFormatSql = useCallback(() => {
-    const formatted = formatSql(queryText);
+  const handleFormatSql = useCallback(async () => {
+    const formatted = await formatSql(queryText);
     dispatch({ type: 'SET_QUERY', sql: formatted });
   }, [queryText, dispatch]);
 

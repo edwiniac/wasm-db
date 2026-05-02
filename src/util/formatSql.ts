@@ -1,6 +1,5 @@
-import { format } from 'sql-formatter';
-
-export function formatSql(sql: string): string {
+export async function formatSql(sql: string): Promise<string> {
+  const { format } = await import('sql-formatter');
   return format(sql, {
     language: 'sql',
     tabWidth: 2,

@@ -63,12 +63,21 @@ FROM parquet_scan('${safeURL}')
 
   signal?.throwIfAborted();
   const handle = await client.runQuery(sql);
-  signal?.throwIfAborted();
+
+  // Bridge abort signal → DuckDB cancel so mid-stream aborts stop the query.
+  const onAbort = () => handle.cancel();
+  signal?.addEventListener('abort', onAbort);
+
   let row: Record<string, unknown> = {};
-  for await (const batch of handle.stream) {
-    if (batch.rows.length > 0) {
-      row = batch.rows[0] as Record<string, unknown>;
+  try {
+    for await (const batch of handle.stream) {
+      signal?.throwIfAborted();
+      if (batch.rows.length > 0) {
+        row = batch.rows[0] as Record<string, unknown>;
+      }
     }
+  } finally {
+    signal?.removeEventListener('abort', onAbort);
   }
 
   const nullCount = Number(row['null_count'] ?? 0);

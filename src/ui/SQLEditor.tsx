@@ -11,7 +11,7 @@ interface SQLEditorProps {
   disabled: boolean;
   onChange: (sql: string) => void;
   onRun: () => void;
-  onFormat?: () => void;
+  onFormat?: () => void | Promise<void>;
 }
 
 export interface SQLEditorHandle {
