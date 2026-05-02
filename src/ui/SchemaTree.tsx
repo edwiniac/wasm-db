@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { ColumnInfo } from '@/state/queryState';
 
 interface SchemaTreeProps {
@@ -10,6 +10,15 @@ interface SchemaTreeProps {
 
 export function SchemaTree({ columns, status, onColumnClick, filter }: SchemaTreeProps) {
   const [highlighted, setHighlighted] = useState<string | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current !== null) {
+        clearTimeout(highlightTimerRef.current);
+      }
+    };
+  }, []);
 
   if (status === 'idle') return null;
 
@@ -36,8 +45,11 @@ export function SchemaTree({ columns, status, onColumnClick, filter }: SchemaTre
 
   function handleClick(col: ColumnInfo) {
     onColumnClick?.(col);
+    if (highlightTimerRef.current !== null) {
+      clearTimeout(highlightTimerRef.current);
+    }
     setHighlighted(col.name);
-    setTimeout(() => setHighlighted(null), 300);
+    highlightTimerRef.current = setTimeout(() => setHighlighted(null), 300);
   }
 
   return (

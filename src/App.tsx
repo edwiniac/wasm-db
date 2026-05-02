@@ -45,8 +45,8 @@ export default function App() {
   const files = useFilesStore((s) => s.files);
   const filesDispatch = useFilesStore((s) => s.filesDispatch);
 
-  const cancelRef = useRef<(() => void) | null>(null);
   const probeAbortRef = useRef<AbortController | null>(null);
+  const statsAbortRef = useRef<AbortController | null>(null);
   const activeHandleRef = useRef<QueryHandle | null>(null);
   const editorRef = useRef<SQLEditorHandle>(null);
 
@@ -141,7 +141,6 @@ export default function App() {
     try {
       const handle = await getEngine().runQuery(queryText);
       activeHandleRef.current = handle;
-      cancelRef.current = () => handle.cancel();
       let total = 0;
       for await (const batch of handle.stream) {
         dispatch({ type: 'BATCH_RECEIVED', batch });
@@ -156,7 +155,6 @@ export default function App() {
       });
     } finally {
       activeHandleRef.current = null;
-      cancelRef.current = null;
     }
   }, [queryText, dispatch]);
 
@@ -164,7 +162,6 @@ export default function App() {
     probeAbortRef.current?.abort();
     activeHandleRef.current?.cancel();
     activeHandleRef.current = null;
-    cancelRef.current = null;
     dispatch({ type: 'CANCEL' });
   }, [dispatch]);
 
@@ -172,13 +169,18 @@ export default function App() {
     (col: ColumnInfo) => {
       editorRef.current?.insertAtCursor(col.name);
 
+      statsAbortRef.current?.abort();
+      const controller = new AbortController();
+      statsAbortRef.current = controller;
+
       async function fetchAndDispatch() {
         if (!parquetURL) return;
         dispatch({ type: 'COLUMN_STATS_START' });
         try {
-          const stats = await fetchColumnStats(getEngine(), parquetURL, col);
+          const stats = await fetchColumnStats(getEngine(), parquetURL, col, controller.signal);
           dispatch({ type: 'COLUMN_STATS_DONE', stats });
-        } catch {
+        } catch (err) {
+          if (err instanceof Error && err.name === 'AbortError') return;
           dispatch({ type: 'COLUMN_STATS_ERROR' });
         }
       }
