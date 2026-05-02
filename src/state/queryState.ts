@@ -1,6 +1,7 @@
 import type { Batch } from '@/engine/types';
 import type { AppError } from '@/errors';
 import type { ColumnInfo } from '@/engine/schema';
+import type { ColumnStats } from '@/engine/columnStats';
 
 export type { ColumnInfo };
 
@@ -20,6 +21,8 @@ export interface QueryState {
   schemaDrift: boolean;
   spillActive: boolean;
   isOnline: boolean;
+  columnStats: ColumnStats | null;
+  columnStatsLoading: boolean;
 }
 
 export type QueryAction =
@@ -40,7 +43,10 @@ export type QueryAction =
   | { type: 'SCHEMA_DRIFT_DETECTED' }
   | { type: 'DISMISS_DRIFT' }
   | { type: 'SET_SPILL_ACTIVE'; active: boolean }
-  | { type: 'SET_ONLINE'; online: boolean };
+  | { type: 'SET_ONLINE'; online: boolean }
+  | { type: 'COLUMN_STATS_START' }
+  | { type: 'COLUMN_STATS_DONE'; stats: ColumnStats }
+  | { type: 'COLUMN_STATS_ERROR' };
 
 export const initialState: QueryState = {
   parquetURL: '',
@@ -55,6 +61,8 @@ export const initialState: QueryState = {
   schemaDrift: false,
   spillActive: false,
   isOnline: true,
+  columnStats: null,
+  columnStatsLoading: false,
 };
 
 export function queryReducer(state: QueryState, action: QueryAction): QueryState {
@@ -100,7 +108,7 @@ export function queryReducer(state: QueryState, action: QueryAction): QueryState
       return { ...initialState };
 
     case 'SCHEMA_START':
-      return { ...state, schemaStatus: 'loading' };
+      return { ...state, schemaStatus: 'loading', columnStats: null, columnStatsLoading: false };
 
     case 'SCHEMA_DONE':
       return { ...state, schemaStatus: 'loaded', schema: action.columns };
@@ -122,6 +130,13 @@ export function queryReducer(state: QueryState, action: QueryAction): QueryState
 
     case 'SET_ONLINE':
       return { ...state, isOnline: action.online };
+
+    case 'COLUMN_STATS_START':
+      return { ...state, columnStatsLoading: true, columnStats: null };
+    case 'COLUMN_STATS_DONE':
+      return { ...state, columnStatsLoading: false, columnStats: action.stats };
+    case 'COLUMN_STATS_ERROR':
+      return { ...state, columnStatsLoading: false, columnStats: null };
 
     default:
       return state;
