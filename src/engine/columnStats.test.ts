@@ -48,9 +48,9 @@ describe('fetchColumnStats — SQL generation', () => {
     ]);
     await fetchColumnStats(engine, 'https://example.com/a.parquet', numericCol);
     const sql = (engine.runQuery as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(sql).toMatch(/MIN\(score\)/i);
-    expect(sql).toMatch(/MAX\(score\)/i);
-    expect(sql).toMatch(/AVG\(TRY_CAST\(score AS DOUBLE\)\)/i);
+    expect(sql).toMatch(/MIN\("score"\)/i);
+    expect(sql).toMatch(/MAX\("score"\)/i);
+    expect(sql).toMatch(/AVG\(TRY_CAST\("score" AS DOUBLE\)\)/i);
     expect(sql).toMatch(/COUNT\(\*\) FILTER/i);
     expect(sql).toMatch(/COUNT\(\*\)/i);
   });

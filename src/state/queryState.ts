@@ -78,6 +78,8 @@ export function queryReducer(state: QueryState, action: QueryAction): QueryState
         schemaStatus: 'idle',
         sharedFingerprint: null,
         schemaDrift: false,
+        columnStats: null,
+        columnStatsLoading: false,
       };
 
     case 'SET_QUERY':

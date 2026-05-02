@@ -137,4 +137,14 @@ describe('queryReducer — column stats actions', () => {
     expect(next.columnStats).toBeNull();
     expect(next.columnStatsLoading).toBe(false);
   });
+
+  it('SET_URL clears columnStats and columnStatsLoading', () => {
+    const withStats = queryReducer(initialState, { type: 'COLUMN_STATS_DONE', stats: mockStats });
+    const next = queryReducer(withStats, {
+      type: 'SET_URL',
+      url: 'https://new.example.com/b.parquet',
+    });
+    expect(next.columnStats).toBeNull();
+    expect(next.columnStatsLoading).toBe(false);
+  });
 });

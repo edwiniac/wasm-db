@@ -37,25 +37,33 @@ function sanitizeURL(url: string): string {
   return url.replace(/'/g, "''");
 }
 
+function quoteIdent(name: string): string {
+  return `"${name.replace(/"/g, '""')}"`;
+}
+
 export async function fetchColumnStats(
   client: EngineClient,
   url: string,
   col: ColumnInfo,
+  signal?: AbortSignal,
 ): Promise<ColumnStats> {
   const safeURL = sanitizeURL(url);
   const colName = col.name;
+  const quotedCol = quoteIdent(colName);
 
   const sql = `
 SELECT
-  MIN(${colName})                              AS col_min,
-  MAX(${colName})                              AS col_max,
-  AVG(TRY_CAST(${colName} AS DOUBLE))         AS col_avg,
-  COUNT(*) FILTER (WHERE ${colName} IS NULL)  AS null_count,
-  COUNT(*)                                     AS total_count
+  MIN(${quotedCol})                              AS col_min,
+  MAX(${quotedCol})                              AS col_max,
+  AVG(TRY_CAST(${quotedCol} AS DOUBLE))         AS col_avg,
+  COUNT(*) FILTER (WHERE ${quotedCol} IS NULL)  AS null_count,
+  COUNT(*)                                       AS total_count
 FROM parquet_scan('${safeURL}')
 `.trim();
 
+  signal?.throwIfAborted();
   const handle = await client.runQuery(sql);
+  signal?.throwIfAborted();
   let row: Record<string, unknown> = {};
   for await (const batch of handle.stream) {
     if (batch.rows.length > 0) {

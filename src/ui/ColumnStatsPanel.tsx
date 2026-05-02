@@ -53,6 +53,12 @@ const labelStyle: React.CSSProperties = {
   color: 'var(--text-muted)',
 };
 
+function formatValue(val: unknown): string {
+  if (val === null || val === undefined) return '—';
+  if (typeof val === 'number') return val.toLocaleString();
+  return String(val);
+}
+
 export function ColumnStatsPanel({ stats, loading }: ColumnStatsPanelProps) {
   if (!loading && !stats) return null;
 
@@ -71,13 +77,6 @@ export function ColumnStatsPanel({ stats, loading }: ColumnStatsPanelProps) {
   const heights = buildHistogramHeights(stats);
   const nullPctDisplay = (stats.nullPct * 100).toFixed(1) + '%';
   const isNumericColumn = stats.avg !== null;
-
-  function formatValue(val: unknown): string {
-    if (val === null || val === undefined) return '—';
-    if (typeof val === 'number') return val.toLocaleString();
-    return String(val);
-  }
-
   const valueColor = isNumericColumn ? 'var(--color-number)' : 'var(--text-secondary)';
 
   return (
@@ -121,7 +120,7 @@ export function ColumnStatsPanel({ stats, loading }: ColumnStatsPanelProps) {
       >
         {heights.map((h, i) => (
           <div
-            key={i}
+            key={`bar-${i}`}
             data-bar-segment
             style={{
               flex: 1,
