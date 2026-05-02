@@ -1,3 +1,5 @@
+import type { Ref } from 'react';
+
 interface TopbarProps {
   url: string;
   isProbing: boolean;
@@ -6,6 +8,7 @@ interface TopbarProps {
   onShare: () => void;
   shareLabel: string;
   shareDisabled: boolean;
+  inputRef?: Ref<HTMLInputElement>;
 }
 
 export function Topbar({
@@ -16,6 +19,7 @@ export function Topbar({
   onShare,
   shareLabel,
   shareDisabled,
+  inputRef,
 }: TopbarProps) {
   const loadDisabled = isProbing || !url.trim();
   const canShare = !shareDisabled && url.trim().length > 0;
@@ -45,6 +49,7 @@ export function Topbar({
         ⬡ wasm-db
       </span>
       <input
+        ref={inputRef}
         type="url"
         value={url}
         onChange={(e) => onUrlChange(e.target.value)}
