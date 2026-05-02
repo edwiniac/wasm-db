@@ -1,12 +1,17 @@
+import { useState } from 'react';
 import type { ColumnInfo } from '@/state/queryState';
 import type { RegisteredFile } from '@/state/filesState';
+import type { ColumnStats } from '@/engine/columnStats';
 import { SchemaTree } from '@/ui/SchemaTree';
 import { FilePanel } from '@/ui/FilePanel';
+import { ColumnStatsPanel } from '@/ui/ColumnStatsPanel';
 
 interface SidebarProps {
   columns: ColumnInfo[] | null;
   schemaStatus: 'idle' | 'loading' | 'loaded' | 'error';
-  onColumnClick?: (columnName: string) => void;
+  onColumnClick?: (col: ColumnInfo) => void;
+  columnStats: ColumnStats | null;
+  columnStatsLoading: boolean;
   files: RegisteredFile[];
   onAddFile: () => void;
   onRemoveFile: (id: string) => void;
@@ -29,10 +34,24 @@ const dividerStyle: React.CSSProperties = {
   margin: '4px 0',
 };
 
+const filterInputStyle: React.CSSProperties = {
+  width: '100%',
+  background: 'var(--bg-base)',
+  border: '1px solid var(--border)',
+  color: 'var(--text-primary)',
+  fontSize: '12px',
+  padding: '4px 8px',
+  borderRadius: 'var(--radius)',
+  boxSizing: 'border-box',
+  outline: 'none',
+};
+
 export function Sidebar({
   columns,
   schemaStatus,
   onColumnClick,
+  columnStats,
+  columnStatsLoading,
   files,
   onAddFile,
   onRemoveFile,
@@ -40,7 +59,16 @@ export function Sidebar({
   onChangeUrl,
   onProbeFile,
 }: SidebarProps) {
-  const colCount = columns?.length ?? 0;
+  const [filterState, setFilterState] = useState<{ columns: ColumnInfo[] | null; value: string }>({
+    columns,
+    value: '',
+  });
+
+  const filter = filterState.columns === columns ? filterState.value : '';
+
+  function setFilter(value: string) {
+    setFilterState({ columns, value });
+  }
 
   return (
     <div
@@ -54,10 +82,26 @@ export function Sidebar({
         overflowY: 'auto',
       }}
     >
-      <div style={sectionLabelStyle}>
-        Columns{schemaStatus === 'loaded' ? ` (${colCount})` : ''}
-      </div>
-      <SchemaTree columns={columns} status={schemaStatus} onColumnClick={onColumnClick} />
+      <div style={sectionLabelStyle}>Columns</div>
+
+      {schemaStatus === 'loaded' && columns && columns.length > 0 && (
+        <div style={{ padding: '0 8px 4px' }}>
+          <input
+            type="text"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Filter columns…"
+            style={filterInputStyle}
+          />
+        </div>
+      )}
+
+      <SchemaTree
+        columns={columns}
+        status={schemaStatus}
+        onColumnClick={onColumnClick}
+        filter={filter}
+      />
 
       <div style={dividerStyle} />
 
@@ -70,6 +114,8 @@ export function Sidebar({
         onChangeUrl={onChangeUrl}
         onProbe={onProbeFile}
       />
+
+      <ColumnStatsPanel stats={columnStats} loading={columnStatsLoading} />
     </div>
   );
 }

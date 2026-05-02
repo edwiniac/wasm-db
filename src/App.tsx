@@ -9,6 +9,8 @@ import {
   registerFile,
   unregisterFile,
 } from '@/state/queryService';
+import { fetchColumnStats } from '@/engine/columnStats';
+import type { ColumnInfo } from '@/state/queryState';
 import { useFilesStore } from '@/state/filesStore';
 import { AppError, TransportError, QueryError, QueryCancelledError } from '@/errors';
 import { logger } from '@/util/logger';
@@ -36,6 +38,8 @@ export default function App() {
   const schemaDrift = useQueryStore((s) => s.schemaDrift);
   const spillActive = useQueryStore((s) => s.spillActive);
   const isOnline = useQueryStore((s) => s.isOnline);
+  const columnStats = useQueryStore((s) => s.columnStats);
+  const columnStatsLoading = useQueryStore((s) => s.columnStatsLoading);
   const dispatch = useQueryStore((s) => s.dispatch);
 
   const files = useFilesStore((s) => s.files);
@@ -164,9 +168,25 @@ export default function App() {
     dispatch({ type: 'CANCEL' });
   }, [dispatch]);
 
-  const handleColumnClick = useCallback((columnName: string) => {
-    editorRef.current?.insertAtCursor(columnName);
-  }, []);
+  const handleColumnClick = useCallback(
+    (col: ColumnInfo) => {
+      editorRef.current?.insertAtCursor(col.name);
+
+      async function fetchAndDispatch() {
+        if (!parquetURL) return;
+        dispatch({ type: 'COLUMN_STATS_START' });
+        try {
+          const stats = await fetchColumnStats(getEngine(), parquetURL, col);
+          dispatch({ type: 'COLUMN_STATS_DONE', stats });
+        } catch {
+          dispatch({ type: 'COLUMN_STATS_ERROR' });
+        }
+      }
+
+      void fetchAndDispatch();
+    },
+    [parquetURL, dispatch],
+  );
 
   const handleCellClick = useCallback(
     (columnName: string, value: unknown) => {
@@ -249,6 +269,8 @@ export default function App() {
           columns={schema}
           schemaStatus={schemaStatus}
           onColumnClick={handleColumnClick}
+          columnStats={columnStats}
+          columnStatsLoading={columnStatsLoading}
           files={files}
           onAddFile={() => filesDispatch({ type: 'ADD_FILE', id: crypto.randomUUID() })}
           onRemoveFile={handleRemoveFile}
