@@ -95,4 +95,12 @@ describe('fetchColumnStats — result parsing', () => {
     const result = await fetchColumnStats(engine, 'https://example.com/a.parquet', numericCol);
     expect(result.nullPct).toBe(1);
   });
+
+  it('computes nullPct=0 when totalCount is 0', async () => {
+    const engine = mockEngine([
+      { col_min: null, col_max: null, col_avg: null, null_count: 0, total_count: 0 },
+    ]);
+    const result = await fetchColumnStats(engine, 'https://example.com/a.parquet', numericCol);
+    expect(result.nullPct).toBe(0);
+  });
 });
