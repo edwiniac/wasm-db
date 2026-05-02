@@ -1,4 +1,5 @@
 import { useCallback, useRef, useEffect, useState } from 'react';
+import { isMacPlatform } from '@/util/featureDetect';
 import { useQueryStore } from '@/state/store';
 import {
   getEngine,
@@ -251,7 +252,7 @@ export default function App() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      const isMac = navigator.platform.toLowerCase().includes('mac');
+      const isMac = isMacPlatform();
       const ctrlOrCmd = isMac ? e.metaKey : e.ctrlKey;
 
       if (ctrlOrCmd && e.key === 'l') {
@@ -372,7 +373,7 @@ export default function App() {
           >
             <button
               onClick={handleFormatSql}
-              disabled={isExecuting}
+              disabled={isExecuting || !queryText.trim()}
               aria-label="Format SQL (Ctrl+Shift+F)"
               title="Format SQL (Ctrl+Shift+F)"
               style={{

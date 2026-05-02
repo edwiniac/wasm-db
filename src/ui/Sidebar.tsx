@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { ColumnInfo } from '@/state/queryState';
 import type { RegisteredFile } from '@/state/filesState';
 import type { ColumnStats } from '@/engine/columnStats';
@@ -22,7 +23,7 @@ interface SidebarProps {
   onHistorySelect: (sql: string) => void;
 }
 
-const sectionLabelStyle: React.CSSProperties = {
+const sectionLabelStyle: CSSProperties = {
   padding: '8px 12px 4px',
   fontSize: '11px',
   fontWeight: 600,
@@ -31,12 +32,12 @@ const sectionLabelStyle: React.CSSProperties = {
   textTransform: 'uppercase',
 };
 
-const dividerStyle: React.CSSProperties = {
+const dividerStyle: CSSProperties = {
   borderTop: '1px solid var(--border)',
   margin: '4px 0',
 };
 
-const filterInputStyle: React.CSSProperties = {
+const filterInputStyle: CSSProperties = {
   width: '100%',
   background: 'var(--bg-base)',
   border: '1px solid var(--border)',

@@ -126,7 +126,11 @@ export const SQLEditor = forwardRef<SQLEditorHandle, SQLEditorProps>(function SQ
   return (
     <div
       ref={containerRef}
-      style={{ border: '1px solid #444', borderRadius: '4px', overflow: 'hidden' }}
+      style={{
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        overflow: 'hidden',
+      }}
       aria-label="SQL editor"
     />
   );

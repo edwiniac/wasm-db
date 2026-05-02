@@ -15,3 +15,12 @@ export async function hasOPFS(): Promise<boolean> {
     return false;
   }
 }
+
+export function isMacPlatform(): boolean {
+  if ((navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform) {
+    return (navigator as { userAgentData?: { platform?: string } })
+      .userAgentData!.platform!.toLowerCase()
+      .includes('mac');
+  }
+  return /Mac|iPhone|iPod|iPad/i.test(navigator.userAgent);
+}
